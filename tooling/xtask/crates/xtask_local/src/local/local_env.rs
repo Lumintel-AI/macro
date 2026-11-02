@@ -692,6 +692,11 @@ struct BootStubEnv;
 
 impl BootStubEnv {
     fn write(&self, env: &mut BTreeMap<String, String>) {
+        // Use the existing LocalStack alias when no external config is loaded.
+        env.insert(
+            "WHATSAPP_SESSION_KMS_KEY_ID".into(),
+            resources::WHATSAPP_SESSION_KMS_ALIAS.into(),
+        );
         // The worker is opt-in and ships paused; an explicit env-file can enable it.
         env.insert("SLACK_IMPORT_ENABLED".into(), "false".into());
         env.insert("SLACK_IMPORT_CONCURRENCY".into(), "1".into());
