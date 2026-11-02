@@ -1,0 +1,136 @@
+# Fork-only workflow, maintained separately from the upstream workflow generator.
+name: Delegate Rust CI
+
+on:
+  push:
+    branches: [self-host, "delegate/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: delegate-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_BUILD_JOBS: "2"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  packages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      matrix: ${{ steps.packages.outputs.matrix }}
+      has_packages: ${{ steps.packages.outputs.has_packages }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install the repository toolchain
+        run: |
+          toolchain=$(python3 -c 'import tomllib; print(tomllib.load(open("rust-toolchain.toml", "rb"))["toolchain"]["channel"])')
+          rustup toolchain install "$toolchain" --profile minimal
+          echo "RUSTUP_TOOLCHAIN=$toolchain" >> "$GITHUB_ENV"
+      - name: Find changed workspace packages
+        id: packages
+        run: |
+          cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/metadata.json"
+          python3 .github/scripts/delegate-ci.py "$RUNNER_TEMP/metadata.json"
+
+  test:
+    needs: packages
+    if: needs.packages.outputs.has_packages == 'true'
+    name: Test ${{ matrix.package }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.packages.outputs.matrix) }}
+    env:
+      PACKAGE: ${{ matrix.package }}
+      DATABASE_URL: postgres://user:password@localhost:5432/macrodb
+      REDIS_URI: redis://127.0.0.1:6379
+      REDIS_URL: redis://127.0.0.1:6379
+      SQLX_OFFLINE: "false"
+      RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+      OPENSSL_NO_VENDOR: "1"
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: macrodb
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U user -d macrodb"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+          --shm-size 1g
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - name: Free runner disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+      - name: Install native build dependencies and the repository toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake clang libclang-dev \
+            pkg-config libssl-dev libcurl4-openssl-dev libglib2.0-dev liblzma-dev \
+            protobuf-compiler mold
+          toolchain=$(python3 -c 'import tomllib; print(tomllib.load(open("rust-toolchain.toml", "rb"))["toolchain"]["channel"])')
+          rustup toolchain install "$toolchain" --profile minimal
+          echo "RUSTUP_TOOLCHAIN=$toolchain" >> "$GITHUB_ENV"
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@e9d7b9f1e587218970671bac74e5511ed9506e6a # v2
+        with:
+          key: delegate-${{ matrix.package }}
+          cache-all-crates: true
+          cache-on-failure: true
+      - name: Install SQLx migration CLI
+        run: |
+          if ! command -v sqlx >/dev/null; then
+            cargo install sqlx-cli --version 0.8.6 --locked --no-default-features --features postgres,rustls
+          fi
+      - name: Configure the disposable PostgreSQL service
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec "$POSTGRES_CONTAINER" psql -v ON_ERROR_STOP=1 -U user -d macrodb \
+            -c 'ALTER SYSTEM SET max_locks_per_transaction = 8192'
+          docker restart "$POSTGRES_CONTAINER"
+          for attempt in $(seq 1 60); do
+            if docker exec "$POSTGRES_CONTAINER" pg_isready -U user -d macrodb; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+      - name: Migrate MacroDB and the SQLx test template
+        run: |
+          sqlx migrate run --source crates/macro_db_client/migrations --database-url "$DATABASE_URL"
+          sqlx migrate run --source crates/macro_db_client/migrations --database-url "${DATABASE_URL%/macrodb}/template1"
+      - name: Run all features and test targets for the changed package
+        run: cargo test --locked --all-features -p "$PACKAGE"
+      - name: Record result and remaining disk
+        if: always()
+        env:
+          RESULT: ${{ job.status }}
+        run: |
+          echo "Package \`$PACKAGE\` finished with $RESULT." >> "$GITHUB_STEP_SUMMARY"
+          df -h /
