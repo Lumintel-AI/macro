@@ -2,6 +2,9 @@ import { isTauri } from './platform';
 
 export function getWebOrigin(): string {
   if (isTauri()) {
+    if (import.meta.env.VITE_PUBLIC_ORIGIN) {
+      return import.meta.env.VITE_PUBLIC_ORIGIN.replace(/\/$/, '');
+    }
     return import.meta.env.MODE === 'development'
       ? 'https://dev.macro.com'
       : 'https://macro.com';

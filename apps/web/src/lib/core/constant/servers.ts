@@ -25,26 +25,37 @@ const serverHostLocal: Servers = {
 
 const devServerSuffix = import.meta.env.MODE === 'development' ? '-dev' : '';
 
-const gatewayHost =
-  import.meta.env.MODE === 'development'
-    ? 'https://dev-gateway.macro.com'
-    : 'https://gateway.macro.com';
+const publicOrigin = import.meta.env.VITE_PUBLIC_ORIGIN;
 
-const authLogoutUrl =
-  import.meta.env.MODE === 'development'
+const gatewayHost =
+  publicOrigin ||
+  (import.meta.env.MODE === 'development'
+    ? 'https://dev-gateway.macro.com'
+    : 'https://gateway.macro.com');
+
+const authLogoutUrl = publicOrigin
+  ? `${publicOrigin}/oauth2/logout?client_id=${import.meta.env.VITE_FUSIONAUTH_CLIENT_ID}&tenantId=${import.meta.env.VITE_FUSIONAUTH_TENANT_ID}`
+  : import.meta.env.MODE === 'development'
     ? 'https://fusionauth-dev.macro.com/oauth2/logout?client_id=eb75fe7a-0ef1-4186-96d9-cc62cfb1d10c&tenantId=5e13f524-8d32-0454-81f8-061936256aa4'
     : 'https://auth.macro.com/oauth2/logout?client_id=75409999-7dc4-4241-b73b-a51818c3a71c&tenantId=a3e53c3d-8d6a-3e92-d64c-fa3bf30a60be';
 
 const directServerHostRemote = {
   'auth-service': `${gatewayHost}/auth`,
   'auth-logout': authLogoutUrl,
-  'pdf-service': `https://pdf-service${devServerSuffix}.macro.com`,
+  // Self-hosted deployments leave PDF jobs and demo WebSockets unavailable.
+  'pdf-service': publicOrigin
+    ? `${publicOrigin}/i`
+    : `https://pdf-service${devServerSuffix}.macro.com`,
   'document-storage-service': `${gatewayHost}/dss`,
-  'websocket-service': `wss://services${devServerSuffix}.macro.com`,
+  'websocket-service': publicOrigin
+    ? `${publicOrigin.replace(/^http/, 'ws')}/websocket`
+    : `wss://services${devServerSuffix}.macro.com`,
   'cognition-service': `${gatewayHost}/cognition`,
   'connection-gateway': `${gatewayHost.replace(/^http/, 'ws')}/connection-gateway`,
   'notification-service': `${gatewayHost}/notification`,
-  'static-file': `https://static-file-service${devServerSuffix}.macro.com`,
+  'static-file': publicOrigin
+    ? `${publicOrigin}/static-file`
+    : `https://static-file-service${devServerSuffix}.macro.com`,
   'unfurl-service': `${gatewayHost}/unfurl`,
   contacts: `${gatewayHost}/contacts`,
   'email-service': `${gatewayHost}/email`,

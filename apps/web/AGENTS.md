@@ -15,6 +15,19 @@
   [web-app delivery](../../infra/stacks/web-app/README.md); its publisher tests
   are backend-free, and its Pulumi tests must not run real staging/cloud commands.
 
+## Production host configuration
+
+Set `VITE_PUBLIC_ORIGIN` to the public HTTP(S) origin to build for a self-hosted
+instance. Set `VITE_FUSIONAUTH_CLIENT_ID` and `VITE_FUSIONAUTH_TENANT_ID` to that
+instance's UUIDs; the build rejects missing identities. `SERVER_HOSTS` uses the
+origin's API prefixes, including `/agent-harness`, `/cognition`, `/preview` and
+`/scheduled-action`. PDF jobs and demo WebSockets target `/i` and `/websocket`;
+keep those routes unavailable when their services are deferred.
+Set `VITE_SYNC_SERVICE_HOST` to the Worker hostname or public hostname plus
+`/sync`, without a scheme. Unset host variables preserve upstream defaults.
+Vite supplies HTML asset paths and the gateway preconnect through `defineEnv`.
+These are public build inputs, so changing them requires rebuilding the image.
+
 ## Verifying a change in a real browser
 
 During iterative visual tweaks, use focused browser verification; defer full typechecks and CI checks until the batch is ready or the user requests them.

@@ -3,7 +3,7 @@ import { unwatchFile, watchFile } from 'node:fs';
 import { resolve } from 'node:path';
 import tailwind from '@tailwindcss/vite';
 import { Features } from 'lightningcss';
-import type { Plugin, Rollup, UserConfigFn } from 'vite';
+import { loadEnv, type Plugin, type Rollup, type UserConfigFn } from 'vite';
 import solid from 'vite-plugin-solid';
 import solidSvg from 'vite-plugin-solid-svg';
 import wasm from 'vite-plugin-wasm';
@@ -307,6 +307,37 @@ export const createAppViteConfig = (): UserConfigFn => {
   return ({ command, mode }) => {
     const ENV_MODE = process.env.MODE ?? mode;
     const NO_MINIFY = process.env.NO_MINIFY === 'true';
+    const env = loadEnv(ENV_MODE, __dirname, 'VITE_');
+    const publicOrigin = env.VITE_PUBLIC_ORIGIN;
+    if (publicOrigin) {
+      const url = new URL(publicOrigin);
+      if (
+        !['http:', 'https:'].includes(url.protocol) ||
+        url.username ||
+        url.password ||
+        url.pathname !== '/' ||
+        url.search ||
+        url.hash
+      ) {
+        throw new Error(
+          'VITE_PUBLIC_ORIGIN must be an HTTP(S) origin without a path, credentials, query or fragment'
+        );
+      }
+      for (const name of [
+        'VITE_FUSIONAUTH_CLIENT_ID',
+        'VITE_FUSIONAUTH_TENANT_ID',
+      ]) {
+        if (
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            env[name] ?? ''
+          )
+        ) {
+          throw new Error(
+            `${name} must be a UUID when VITE_PUBLIC_ORIGIN is set`
+          );
+        }
+      }
+    }
 
     return {
       base: command === 'serve' ? '/' : '/app',
@@ -338,7 +369,7 @@ export const createAppViteConfig = (): UserConfigFn => {
         cloudFrontCompressionLimit(),
         posthogSourceMapLimit(),
       ],
-      define: defineEnv(ENV_MODE, command),
+      define: defineEnv(ENV_MODE, command, publicOrigin),
       clearScreen: false,
       worker: {
         format: 'es',
@@ -486,7 +517,7 @@ function getAssetsPath(mode: string, command: string): string {
   }
 }
 
-function defineEnv(mode: string, command: string) {
+function defineEnv(mode: string, command: string, publicOrigin?: string) {
   // `vite build` compiles DEV from NODE_ENV, not MODE. Local-backend static
   // bundles already set VITE_LOCAL_BACKEND_ORIGIN (stack up);
   // keep DEV so those artifacts match `just run_local` (vite serve). Hosted
@@ -499,13 +530,24 @@ function defineEnv(mode: string, command: string) {
   return {
     'import.meta.env.__APP_VERSION__': JSON.stringify(appVersion),
     'import.meta.env.__APP_BUILD_TIME__': JSON.stringify(appBuildTime),
-    'import.meta.env.ASSETS_PATH': JSON.stringify(getAssetsPath(mode, command)),
-    // index.html preconnects to the API gateway; keep in sync with servers.ts.
-    'import.meta.env.GATEWAY_ORIGIN': JSON.stringify(
-      mode === 'development'
-        ? 'https://dev-gateway.macro.com'
-        : 'https://gateway.macro.com'
+    // Vite also uses these definitions for %NAME% placeholders in HTML.
+    'import.meta.env.ASSETS_PATH': JSON.stringify(
+      getAssetsPath(mode, command).replace(/\/$/, '')
     ),
+    'import.meta.env.GATEWAY_ORIGIN': JSON.stringify(
+      publicOrigin
+        ? new URL(publicOrigin).origin
+        : mode === 'development'
+          ? 'https://dev-gateway.macro.com'
+          : 'https://gateway.macro.com'
+    ),
+    ...(publicOrigin
+      ? {
+          'import.meta.env.VITE_PUBLIC_ORIGIN': JSON.stringify(
+            new URL(publicOrigin).origin
+          ),
+        }
+      : {}),
     'import.meta.env.__LOCAL_DOCKER__': process.env.LOCAL_DOCKER === 'true',
     'import.meta.env.__LOCAL_JWT__': JSON.stringify(process.env.LOCAL_JWT),
     'import.meta.env.__GIT_BRANCH__': JSON.stringify(

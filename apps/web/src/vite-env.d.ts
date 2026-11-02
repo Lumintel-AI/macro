@@ -1,4 +1,10 @@
 interface ImportMetaEnv {
+  /** Single public HTTP(S) origin for self-hosted APIs and hosted logout. */
+  readonly VITE_PUBLIC_ORIGIN?: string;
+  readonly VITE_FUSIONAUTH_CLIENT_ID?: string;
+  readonly VITE_FUSIONAUTH_TENANT_ID?: string;
+  /** Worker hostname, optionally followed by the Caddy /sync prefix. */
+  readonly VITE_SYNC_SERVICE_HOST?: string;
   readonly __APP_VERSION__: string;
   /** When this build was made, in ms since the epoch. Unset outside app builds. */
   readonly __APP_BUILD_TIME__?: number;
