@@ -46,7 +46,7 @@ mod webhooks;
 // Misc
 mod middleware;
 pub(crate) mod swagger;
-mod utils;
+pub(crate) mod utils;
 
 #[cfg(test)]
 mod test;

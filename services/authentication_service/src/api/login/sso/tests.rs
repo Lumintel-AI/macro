@@ -223,11 +223,12 @@ fn local_frontend_origin_is_accepted_only_when_configured() {
     let origin = Url::parse("https://peter-dev:29809").unwrap();
     for path in ["/app/login", "/app/inbox-link-callback"] {
         let url = origin.join(path).unwrap();
-        assert!(is_allowed_original_url_with_local_origin(
+        assert!(is_allowed_original_url_with_origin(
             &url,
-            Some(&origin)
+            Some(&origin),
+            false
         ));
-        assert!(!is_allowed_original_url_with_local_origin(&url, None));
+        assert!(!is_allowed_original_url_with_origin(&url, None, false));
     }
 }
 
@@ -245,13 +246,40 @@ fn local_frontend_origin_requires_exact_https_origin_without_credentials() {
     ] {
         let url = Url::parse(candidate).unwrap();
         assert!(
-            !is_allowed_original_url_with_local_origin(&url, Some(&origin)),
+            !is_allowed_original_url_with_origin(&url, Some(&origin), false),
             "{url}"
         );
     }
     let http_origin = Url::parse("http://peter-dev:29809").unwrap();
-    assert!(!is_allowed_original_url_with_local_origin(
+    assert!(!is_allowed_original_url_with_origin(
         &http_origin,
-        Some(&http_origin)
+        Some(&http_origin),
+        false
     ));
+}
+
+#[test]
+fn hosted_frontend_redirects_require_the_exact_configured_origin() {
+    let origin = Url::parse("https://app.example.com:8443").unwrap();
+    assert!(is_allowed_original_url_with_origin(
+        &origin.join("/app/task/123").unwrap(),
+        Some(&origin),
+        true
+    ));
+    for candidate in [
+        "https://app.example.com/app",
+        "http://app.example.com:8443/app",
+        "https://app.example.com.evil.example:8443/app",
+        "https://macro.com/app",
+        "https://user:password@app.example.com:8443/app",
+    ] {
+        assert!(
+            !is_allowed_original_url_with_origin(
+                &Url::parse(candidate).unwrap(),
+                Some(&origin),
+                true
+            ),
+            "{candidate}"
+        );
+    }
 }

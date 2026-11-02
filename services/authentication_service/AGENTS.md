@@ -131,3 +131,12 @@ inputs cannot select an agent, and ordinary user credentials remain unattributed
 
 - Rules: `.agents/rules/config-and-service-urls.md`,
   `.agents/rules/rust/security.md` · Skill: `new-service`
+
+## Frontend origin
+
+Login destinations and cookie domains use `FRONTEND_ORIGIN` when set, then
+`AppServiceUrl` via `OVERRIDE_APP_SERVICE_URL`. Custom origins replace the hosted
+SSO redirect allowlist with an exact scheme, host and port match. Native app
+schemes and localhost routes remain supported. Local cookies stay host-only.
+Without overrides, the existing hosted domains and local `FRONTEND_PORT` remain.
+The service validates the origin at startup.

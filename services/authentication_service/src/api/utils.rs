@@ -47,31 +47,80 @@ pub fn generate_session_code() -> String {
     code_chars.into_iter().collect()
 }
 
-/// Returns the default redirect url based on the environment
-pub fn default_redirect_url() -> Url {
-    match Environment::new_or_prod() {
-        Environment::Local => {
-            if let Some(origin) = FrontendOrigin::new() {
-                return origin.parse().unwrap_or_else(|_| {
-                    panic!("FRONTEND_ORIGIN must be a URL, got {}", origin.as_ref())
-                });
-            }
-            let port = FrontendPort::new()
-                .map(|port| port.to_string())
-                .unwrap_or_else(|| "3000".to_string());
-            format!("http://localhost:{port}").parse().unwrap()
-        }
-        Environment::Develop => "https://dev.macro.com/app".parse().unwrap(),
-        Environment::Production => "https://macro.com/app".parse().unwrap(),
+pub(crate) struct FrontendConfig {
+    redirect_url: Url,
+    cookie_domain: Option<String>,
+    pub(crate) custom_origin: bool,
+}
+
+pub(crate) static FRONTEND_CONFIG: std::sync::LazyLock<FrontendConfig> =
+    std::sync::LazyLock::new(|| {
+        let environment = Environment::new_or_prod();
+        let app_url = macro_service_urls::AppServiceUrl::unwrap_new();
+        let origin = FrontendOrigin::new();
+        let port = FrontendPort::new();
+        resolve_frontend(
+            environment,
+            app_url.as_str(),
+            origin.as_ref().and_then(FrontendOrigin::value),
+            port.as_ref().and_then(FrontendPort::value),
+        )
+    });
+
+fn resolve_frontend(
+    environment: Environment,
+    app_url: &str,
+    frontend_origin: Option<&str>,
+    port: Option<&str>,
+) -> FrontendConfig {
+    let default = macro_service_urls::AppServiceUrl::default_for_environment(environment);
+    let custom_origin = frontend_origin.is_some() || app_url != default.as_str();
+    let origin = frontend_origin.unwrap_or(app_url);
+    let origin = if matches!(environment, Environment::Local) && !custom_origin {
+        format!("http://localhost:{}", port.unwrap_or("3000"))
+    } else {
+        origin.to_owned()
+    };
+    let mut redirect_url = Url::parse(&origin).expect("frontend origin must be a valid URL");
+    assert!(
+        matches!(redirect_url.scheme(), "http" | "https")
+            && redirect_url.host_str().is_some()
+            && redirect_url.username().is_empty()
+            && redirect_url.password().is_none()
+            && redirect_url.path() == "/"
+            && redirect_url.query().is_none()
+            && redirect_url.fragment().is_none(),
+        "frontend origin must be an HTTP(S) origin without credentials, path, query or fragment"
+    );
+    let cookie_domain = match environment {
+        Environment::Local => None,
+        _ if !custom_origin => Some("macro.com".to_owned()),
+        _ => match redirect_url.host() {
+            Some(url::Host::Domain(domain)) if domain != "localhost" => Some(domain.to_owned()),
+            _ => None,
+        },
+    };
+    if !matches!(environment, Environment::Local) {
+        redirect_url.set_path("/app");
+    }
+    FrontendConfig {
+        redirect_url,
+        cookie_domain,
+        custom_origin,
     }
 }
 
-fn domain<'a>() -> Option<&'a str> {
-    match Environment::new_or_prod() {
-        Environment::Local => None,
-        Environment::Production | Environment::Develop => Some("macro.com"),
-    }
+/// Returns the configured frontend destination after login.
+pub fn default_redirect_url() -> Url {
+    FRONTEND_CONFIG.redirect_url.clone()
 }
+
+fn domain() -> Option<String> {
+    FRONTEND_CONFIG.cookie_domain.clone()
+}
+
+#[cfg(test)]
+mod test;
 
 fn same_site() -> SameSite {
     match Environment::new_or_prod() {

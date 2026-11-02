@@ -110,6 +110,7 @@ pub async fn run() -> anyhow::Result<()> {
     );
 
     // Parse our configuration from the environment.
+    std::sync::LazyLock::force(&crate::api::utils::FRONTEND_CONFIG);
     let config = Config::from_env().context("expected to be able to generate config")?;
     let account_link_state_key = config.account_link_state_key()?;
     let signup_policy = Arc::new(
