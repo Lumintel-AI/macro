@@ -734,6 +734,7 @@ pub async fn run() -> anyhow::Result<()> {
             signup_policy,
             rate_limit_service: rate_limit,
             calendar_scope_enabled: config.calendar_scope_enabled,
+            support_channels_enabled: config.support_channels_enabled,
             auth_sender_address,
             account_link_state_key,
             jwt_args,

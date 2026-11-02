@@ -215,6 +215,9 @@ pub struct Config {
     /// calendar feature isn't using yet.
     #[macro_config_default(false)]
     pub calendar_scope_enabled: bool,
+    /// Create support channels with the upstream staff accounts after signup.
+    #[macro_config_default(true)]
+    pub support_channels_enabled: bool,
     /// Domain used by the auth sender.
     pub sender_base_address: SenderBaseAddress,
 }

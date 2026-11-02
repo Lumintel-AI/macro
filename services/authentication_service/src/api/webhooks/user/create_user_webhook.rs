@@ -524,9 +524,14 @@ async fn create_user_webhook(ctx: &ApiContext, req: FusionAuthUserWebhook) -> an
         let favorites_service = ctx.favorites_service.clone();
         let user_id = user_id.clone();
         let support_channel_name = support_channel_name.clone();
+        let support_channels_enabled = ctx.support_channels_enabled;
         async move {
             initialize_starter_docs_with_retries(&document_storage_service_client, &user_id)
                 .await;
+
+            if !support_channels_enabled {
+                return;
+            }
 
             let owner_id = match MacroUserIdStr::try_from(user_id) {
                 Ok(owner_id) => owner_id,

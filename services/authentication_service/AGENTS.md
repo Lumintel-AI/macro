@@ -145,3 +145,8 @@ The service validates the origin at startup.
 
 `SENDER_BASE_ADDRESS` sets the domain for `auth@<domain>`. It defaults to
 `macro.com` and is validated at startup.
+
+## Signup support channels
+
+Set `SUPPORT_CHANNELS_ENABLED=false` to skip upstream staff support channels
+while retaining starter documents. Support channels remain enabled by default.
