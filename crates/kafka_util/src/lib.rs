@@ -1,7 +1,7 @@
 #![deny(missing_docs)]
 //! Environment-aware Kafka producer and consumer transports.
 //!
-//! These adapters centralize the repository's plaintext-local versus MSK-IAM
+//! These adapters centralize the repository's configurable plaintext versus MSK-IAM
 //! transport setup. Application inbound adapters retain responsibility for
 //! decoding, retries, poison-message handling, and deciding when to commit.
 
@@ -31,6 +31,30 @@ use statistics::StatisticsContext;
 
 mod msk_iam;
 mod statistics;
+
+macro_env_var::maybe_env_var! {
+    /// Use plaintext Kafka outside local mode. Defaults to false.
+    struct KafkaPlaintext;
+}
+
+fn use_plaintext(environment: Environment, configured: Option<&str>) -> bool {
+    let enabled = configured
+        .map(|value| {
+            value
+                .parse::<bool>()
+                .expect("KAFKA_PLAINTEXT must be true or false")
+        })
+        .unwrap_or(false);
+    matches!(environment, Environment::Local) || enabled
+}
+
+fn plaintext_from_env() -> bool {
+    let configured = KafkaPlaintext::new();
+    use_plaintext(
+        Environment::new_or_prod(),
+        configured.as_ref().and_then(KafkaPlaintext::value),
+    )
+}
 
 const UNGROUPED_GROUP_PREFIX: &str = "macro-event-broker-independent";
 const MESSAGE_TIMEOUT_MS: &str = "5000";
@@ -255,8 +279,8 @@ fn create_consumer_from_env<T>(
     config: ClientConfig,
     observer: Option<ConsumerStatistics>,
 ) -> Result<KafkaEventConsumer<T>, KafkaConsumerError> {
-    let consumer = match Environment::new_or_prod() {
-        Environment::Local => Either::Left(
+    let consumer = match plaintext_from_env() {
+        true => Either::Left(
             config
                 .create_with_context(StatisticsContext {
                     inner: DefaultConsumerContext,
@@ -264,7 +288,7 @@ fn create_consumer_from_env<T>(
                 })
                 .map_err(KafkaConsumerError::Plaintext)?,
         ),
-        Environment::Develop | Environment::Production => {
+        false => {
             let config = configure_sasl_iam(config);
             Either::Right(
                 config
@@ -286,9 +310,9 @@ fn create_consumer_from_env<T>(
 fn create_producer_from_env(
     config: ClientConfig,
 ) -> Result<KafkaEventProducer, KafkaProducerError> {
-    let producer = match Environment::new_or_prod() {
-        Environment::Local => Either::Left(config.create().map_err(KafkaProducerError::Plaintext)?),
-        Environment::Develop | Environment::Production => {
+    let producer = match plaintext_from_env() {
+        true => Either::Left(config.create().map_err(KafkaProducerError::Plaintext)?),
+        false => {
             let config = configure_sasl_iam(config);
             Either::Right(
                 config

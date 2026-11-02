@@ -60,3 +60,20 @@ fn ungrouped_config_uses_unique_internal_groups_without_offset_storage() {
     assert_eq!(first.get("enable.auto.offset.store"), Some("false"));
     assert_eq!(first.get("auto.offset.reset"), None);
 }
+
+#[test]
+fn hosted_kafka_only_uses_plaintext_when_enabled() {
+    for environment in [Environment::Develop, Environment::Production] {
+        assert!(!use_plaintext(environment, None));
+        assert!(!use_plaintext(environment, Some("false")));
+        assert!(use_plaintext(environment, Some("true")));
+    }
+    assert!(use_plaintext(Environment::Local, None));
+    assert!(use_plaintext(Environment::Local, Some("false")));
+}
+
+#[test]
+#[should_panic(expected = "KAFKA_PLAINTEXT must be true or false")]
+fn invalid_kafka_plaintext_setting_is_rejected() {
+    use_plaintext(Environment::Production, Some("yes"));
+}

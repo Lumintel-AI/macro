@@ -3,7 +3,8 @@
 ## What it is
 
 Shared environment-aware Kafka transports: plaintext locally, MSK IAM in hosted
-environments, with trace propagation and typed grouped/ungrouped consumers.
+environments unless `KAFKA_PLAINTEXT=true`. Both transports preserve trace
+propagation and typed grouped/ungrouped consumers.
 
 ## Start here
 
