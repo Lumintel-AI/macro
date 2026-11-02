@@ -53,7 +53,7 @@ pub enum InitGithubLinkError {
     #[error("internal error occurred")]
     InternalError(#[from] anyhow::Error),
     /// Internal github error
-    #[error("internal error occurred")]
+    #[error(transparent)]
     GithubServiceError(#[from] GithubError),
     /// The identity provider was not found
     #[error("identity provider not found")]
@@ -64,6 +64,9 @@ impl IntoResponse for InitGithubLinkError {
     fn into_response(self) -> Response {
         let message = self.to_string();
         let status_code: StatusCode = match &self {
+            InitGithubLinkError::GithubServiceError(GithubError::Unavailable) => {
+                StatusCode::SERVICE_UNAVAILABLE
+            }
             InitGithubLinkError::InvalidUserId(_) => StatusCode::BAD_REQUEST,
             InitGithubLinkError::TooManyInProgressLinks => StatusCode::TOO_MANY_REQUESTS,
             InitGithubLinkError::InternalError(_)
@@ -182,6 +185,12 @@ pub async fn init_github_link_handler(
     ip_context: ClientIp,
     authorization: MacroAuthorizationExtractor<AuthorizationService, UserOrInternal>,
 ) -> Result<Json<InitGithubLinkResponse>, InitGithubLinkError> {
+    if ctx.config.github_client_id.is_none()
+        || ctx.config.github_client_secret.is_none()
+        || ctx.config.github_idp_id.is_none()
+    {
+        return Err(GithubError::Unavailable.into());
+    }
     let Query(InitGithubLinkQueryParams { original_url }) = query;
     let fusion_user_id = &authorization.authorization.user.user_context.fusion_user_id;
     let initiator =
@@ -247,7 +256,7 @@ pub enum DeleteGithubLinkError {
     #[error("internal error occurred")]
     InternalError(#[from] anyhow::Error),
     /// Internal github error
-    #[error("internal error occurred")]
+    #[error(transparent)]
     GithubServiceError(#[from] GithubError),
 }
 
@@ -255,6 +264,9 @@ impl IntoResponse for DeleteGithubLinkError {
     fn into_response(self) -> Response {
         let message = self.to_string();
         let status_code: StatusCode = match &self {
+            DeleteGithubLinkError::GithubServiceError(GithubError::Unavailable) => {
+                StatusCode::SERVICE_UNAVAILABLE
+            }
             DeleteGithubLinkError::InternalError(_)
             | DeleteGithubLinkError::GithubServiceError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };

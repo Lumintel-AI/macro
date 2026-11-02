@@ -125,6 +125,16 @@ jobs:
         run: |
           sqlx migrate run --source crates/macro_db_client/migrations --database-url "$DATABASE_URL"
           sqlx migrate run --source crates/macro_db_client/migrations --database-url "${DATABASE_URL%/macrodb}/template1"
+      - name: Refresh query metadata for optional billing identities
+        if: matrix.package == 'macro_db_client'
+        run: cargo sqlx prepare --workspace -- --package macro_db_client --package referral --lib
+      - name: Save generated query metadata
+        if: always() && matrix.package == 'macro_db_client'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: optional-billing-query-metadata
+          include-hidden-files: true
+          path: .sqlx/
       - name: Run the changed package's test targets
         run: |
           # The worker's storage backends are mutually exclusive, as in upstream CI.

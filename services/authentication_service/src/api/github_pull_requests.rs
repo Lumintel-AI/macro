@@ -29,6 +29,10 @@ pub enum EnrichGithubPullRequestsProxyError {
 impl IntoResponse for EnrichGithubPullRequestsProxyError {
     fn into_response(self) -> Response {
         let (status_code, message) = match &self {
+            Self::Github(GithubError::Unavailable) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "GitHub is unavailable: integration is not configured".into(),
+            ),
             Self::Github(GithubError::NoLinkFound) => {
                 (StatusCode::NOT_FOUND, "no github link found")
             }
@@ -61,6 +65,10 @@ pub enum MergeGithubPullRequestError {
 impl IntoResponse for MergeGithubPullRequestError {
     fn into_response(self) -> Response {
         let (status_code, message) = match self {
+            Self::Github(GithubError::Unavailable) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "GitHub is unavailable: integration is not configured".into(),
+            ),
             Self::Github(GithubError::NoLinkFound) => {
                 (StatusCode::NOT_FOUND, "no github link found".to_string())
             }
@@ -101,6 +109,10 @@ pub enum UpdateGithubPullRequestError {
 impl IntoResponse for UpdateGithubPullRequestError {
     fn into_response(self) -> Response {
         let (status_code, message) = match self {
+            Self::Github(GithubError::Unavailable) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "GitHub is unavailable: integration is not configured".into(),
+            ),
             Self::Github(GithubError::NoLinkFound) => {
                 (StatusCode::NOT_FOUND, "no github link found".to_string())
             }

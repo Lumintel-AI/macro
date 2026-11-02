@@ -24,12 +24,21 @@ pub trait JobUpdateSender: Send + Sync {
 }
 
 /// Validated callback configuration, loaded once at startup.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum JobUpdateConfig {
     /// The upstream asynchronous callback.
     Lambda { function_name: String },
     /// The owned connection gateway, authenticated with the fleet key.
     Gateway(Arc<ConnectionGatewayClient>),
+}
+
+impl std::fmt::Debug for JobUpdateConfig {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Lambda { .. } => "JobUpdateConfig::Lambda",
+            Self::Gateway(_) => "JobUpdateConfig::Gateway",
+        })
+    }
 }
 
 impl JobUpdateConfig {

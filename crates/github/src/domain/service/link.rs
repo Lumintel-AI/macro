@@ -66,11 +66,7 @@ impl<R: GithubRepo, U: GithubOauth, F: Auth, E: GithubPullRequestService>
     }
 
     fn config(&self) -> Result<&super::GithubLinkConfig, GithubError> {
-        self.config.as_ref().ok_or_else(|| {
-            GithubError::Internal(anyhow::anyhow!(
-                "GitHub OAuth is unavailable: integration is not configured"
-            ))
-        })
+        self.config.as_ref().ok_or(GithubError::Unavailable)
     }
 
     async fn find_user_link(

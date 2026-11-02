@@ -320,6 +320,7 @@ where
 
 fn error_response(e: BillingError) -> Response {
     let status = match &e {
+        BillingError::PaymentsUnavailable => StatusCode::SERVICE_UNAVAILABLE,
         BillingError::NotPayer => StatusCode::FORBIDDEN,
         BillingError::FreePlan => StatusCode::PAYMENT_REQUIRED,
         BillingError::InvalidCreditAmount

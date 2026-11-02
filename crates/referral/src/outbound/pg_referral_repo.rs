@@ -155,12 +155,12 @@ impl ReferralRepo for PgReferralRepo {
 
         sqlx::query!(
             r#"
-            SELECT stripe_customer_id FROM macro_user
+            SELECT stripe_customer_id AS "stripe_customer_id?" FROM macro_user
             WHERE id = $1
         "#,
             fusion_user_id,
         )
-        .map(|s| s.stripe_customer_id)
+        .try_map(|s| s.stripe_customer_id.ok_or(sqlx::Error::RowNotFound))
         .fetch_one(&self.pool)
         .await
     }

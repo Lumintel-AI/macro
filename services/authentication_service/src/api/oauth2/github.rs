@@ -32,6 +32,10 @@ pub enum GithubLinkError {
 impl IntoResponse for GithubLinkError {
     fn into_response(self) -> Response {
         let (status_code, message): (StatusCode, &str) = match &self {
+            GithubLinkError::GithubServiceError(GithubError::Unavailable) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "GitHub is unavailable: integration is not configured",
+            ),
             GithubLinkError::GithubServiceError(GithubError::NoLinkFound) => {
                 (StatusCode::NOT_FOUND, "no github link found")
             }

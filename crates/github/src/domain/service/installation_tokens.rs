@@ -80,11 +80,7 @@ where
         repository: &str,
         permissions: &[(&str, &str)],
     ) -> Result<GithubInstallationAccessToken, GithubError> {
-        let config = self.config.as_ref().ok_or_else(|| {
-            GithubError::Internal(anyhow::anyhow!(
-                "GitHub App is unavailable: integration is not configured"
-            ))
-        })?;
+        let config = self.config.as_ref().ok_or(GithubError::Unavailable)?;
         let jwt = app_jwt(&config.client_id, &config.private_key_pem)?;
 
         let installation = self

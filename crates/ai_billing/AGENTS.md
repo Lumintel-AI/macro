@@ -58,4 +58,4 @@ provider cost (plus markup for overage).
 
 ## Optional payment provider
 
-`Option<StripePaymentGateway>` implements the payment port. An absent gateway rejects payments through `NoOpPaymentGateway` and reports no provider subscription period. Compositions can retain usage reads without creating a Stripe client.
+`Option<StripePaymentGateway>` implements the payment port. An absent gateway returns `BillingError::PaymentsUnavailable` as HTTP 503 for payments and reports no provider subscription period. Compositions can retain usage reads without creating a Stripe client.

@@ -43,7 +43,7 @@ pub async fn get_macro_user(
     let result = sqlx::query_as!(
         MacroUser,
         r#"
-        SELECT id, username, stripe_customer_id
+        SELECT id, username, stripe_customer_id AS "stripe_customer_id?"
         FROM macro_user
         WHERE id = $1
         "#,

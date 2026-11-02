@@ -131,21 +131,6 @@ impl<
             event_broker: NoopMacroEventBroker,
         }
     }
-}
-
-impl<
-    R: CallRepository,
-    C: CallRtcClient,
-    Cn: ConnectionService,
-    E: EntityAccessService,
-    N: NotificationIngress,
-    S: RecordingStorage,
-    Sm: CallSummarizer,
-    V: VoipPushSender,
-    Vr: VoiceRepository,
-    B: MacroEventBroker,
-> CallServiceImpl<R, C, Cn, E, N, S, Sm, V, Vr, B>
-{
     /// Build calls with an optional RTC origin.
     pub fn new_optional(
         repo: R,

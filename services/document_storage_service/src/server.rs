@@ -9,10 +9,7 @@ use crate::{
             TaskPropertiesAdapter,
         },
     },
-    config::{
-        self, CalEventTypeContentNamesKey, CalWebhookSecretKey, Config, Environment,
-        MetaAccessToken, MetaPixelId, MetaTestEventCode,
-    },
+    config::{self, Config, Environment},
     outbound,
     service::{self, s3::S3},
 };
