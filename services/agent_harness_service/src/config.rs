@@ -257,7 +257,7 @@ pub struct Config {
     /// S3 bucket of pull request patches, owned by document-storage-service and
     /// shared with it, so a session capture reuses the patch a pull request
     /// viewer stored for the same base and head.
-    pub github_pull_request_patch_bucket: String,
+    pub github_pull_request_patch_bucket: Option<String>,
     /// Client id of the GitHub App installation tokens are minted for.
     pub github_sync_app_client_id: Option<String>,
     /// PEM private key of that App.

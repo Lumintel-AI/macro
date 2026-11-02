@@ -46,7 +46,7 @@ const CACHE_CAPACITY: usize = 1024;
 
 /// Answers "which repositories can this user reach through our App?".
 pub struct ReachableRepositoriesService<Installations, Client> {
-    config: InstallationTokenConfig,
+    config: Option<InstallationTokenConfig>,
     installations: Installations,
     client: Client,
     cached: Mutex<LruCache<MacroUserIdStr<'static>, CachedListing>>,
@@ -65,12 +65,12 @@ where
     /// Build the service over the App's credentials, the installation records
     /// that say who owns which installation, and a GitHub client.
     pub fn new(
-        config: InstallationTokenConfig,
+        config: impl Into<Option<InstallationTokenConfig>>,
         installations: Installations,
         client: Client,
     ) -> Self {
         Self {
-            config,
+            config: config.into(),
             installations,
             client,
             cached: Mutex::new(LruCache::new(
@@ -89,6 +89,7 @@ where
         &self,
         macro_user_id: &MacroUserIdStr<'_>,
     ) -> Result<Vec<GithubRepository>, GithubError> {
+        self.config.as_ref().ok_or(GithubError::Unavailable)?;
         if let Some(cached) = self.cached_listing(macro_user_id) {
             return Ok(cached);
         }
@@ -154,7 +155,8 @@ where
             return Ok((Vec::new(), true));
         }
 
-        let jwt = app_jwt(&self.config.client_id, &self.config.private_key_pem)?;
+        let config = self.config.as_ref().ok_or(GithubError::Unavailable)?;
+        let jwt = app_jwt(&config.client_id, &config.private_key_pem)?;
         let mut repositories = Vec::new();
 
         let mut failure = None;

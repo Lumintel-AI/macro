@@ -47,3 +47,7 @@ lists visible PRs.
 ## Related
 
 - Rules: `.agents/rules/rust/architecture.md`, `.agents/rules/rust/db.md`
+
+## Optional patch storage
+
+`S3GithubPullRequestPatchStore::new_optional` accepts an absent bucket and rejects patch reads and writes before any S3 request. PR metadata reads remain independent. The configured `new` constructor preserves the existing path.

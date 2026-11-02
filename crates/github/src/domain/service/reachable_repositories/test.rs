@@ -355,3 +355,20 @@ async fn all_installations_unavailable_is_an_error_not_an_empty_candidate_list()
     assert!(service.for_user(&user()).await.is_err());
     assert!(service.cached_listing(&user()).is_none());
 }
+
+#[tokio::test]
+async fn absent_app_credentials_refuse_repository_listing_without_provider_calls() {
+    let service = ReachableRepositoriesService::new(
+        None::<InstallationTokenConfig>,
+        FakeRepo {
+            installations: Vec::new(),
+            teams: Vec::new(),
+        },
+        FakeClient::new(HashMap::new()),
+    );
+    assert!(matches!(
+        service.for_user(&user()).await,
+        Err(GithubError::Unavailable)
+    ));
+    assert!(service.client.listed.lock().unwrap().is_empty());
+}

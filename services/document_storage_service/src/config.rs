@@ -107,7 +107,7 @@ pub struct Config {
     pub database_url_readonly: DatabaseUrlReadonly,
     pub document_storage_bucket: DocumentStorageBucket,
     pub docx_document_upload_bucket: DocxDocumentUploadBucket,
-    pub github_pull_request_patch_bucket: GithubPullRequestPatchBucket,
+    pub github_pull_request_patch_bucket: Option<GithubPullRequestPatchBucket>,
     pub document_storage_service_cloudfront_distribution_url:
         DocumentStorageServiceCloudfrontDistributionUrl,
     pub document_storage_service_cloudfront_signer_public_key_id:

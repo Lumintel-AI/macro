@@ -2,6 +2,7 @@
 //! minted by the domain; this adapter only moves bytes. Patches are UTF-8 text of at most a few
 //! megabytes, so they are read whole.
 
+use anyhow::Context;
 use aws_sdk_s3::primitives::ByteStream;
 
 use crate::domain::ports::GithubPullRequestPatchStore;
@@ -10,14 +11,26 @@ use crate::domain::ports::GithubPullRequestPatchStore;
 #[derive(Clone)]
 pub struct S3GithubPullRequestPatchStore {
     client: aws_sdk_s3::Client,
-    bucket: String,
+    bucket: Option<String>,
 }
 
 impl S3GithubPullRequestPatchStore {
     /// Store patches in `bucket` through `client`.
     #[must_use]
     pub fn new(client: aws_sdk_s3::Client, bucket: String) -> Self {
+        Self {
+            client,
+            bucket: Some(bucket),
+        }
+    }
+    /// Keep patch storage unavailable when its bucket is not configured.
+    #[must_use]
+    pub fn new_optional(client: aws_sdk_s3::Client, bucket: Option<String>) -> Self {
         Self { client, bucket }
+    }
+
+    fn bucket(&self) -> anyhow::Result<&str> {
+        self.bucket.as_deref().context("GitHub pull request patches are unavailable. GITHUB_PULL_REQUEST_PATCH_BUCKET is not configured")
     }
 }
 
@@ -28,7 +41,7 @@ impl GithubPullRequestPatchStore for S3GithubPullRequestPatchStore {
     async fn put_patch(&self, key: &str, patch: &str) -> Result<(), Self::Err> {
         self.client
             .put_object()
-            .bucket(&self.bucket)
+            .bucket(self.bucket()?)
             .key(key)
             .content_type("text/x-diff; charset=utf-8")
             .body(ByteStream::from(patch.as_bytes().to_vec()))
@@ -43,7 +56,7 @@ impl GithubPullRequestPatchStore for S3GithubPullRequestPatchStore {
         let response = match self
             .client
             .get_object()
-            .bucket(&self.bucket)
+            .bucket(self.bucket()?)
             .key(key)
             .send()
             .await

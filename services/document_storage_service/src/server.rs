@@ -721,8 +721,9 @@ pub async fn run() -> anyhow::Result<()> {
     let github_pull_request_changes_state = match (
         config.github_sync_app_client_id.as_ref(),
         config.github_sync_app_pem_secret_key.0.as_ref(),
+        config.github_pull_request_patch_bucket.as_ref(),
     ) {
-        (Some(client_id), Some(pem)) => {
+        (Some(client_id), Some(pem), Some(bucket)) => {
             let github_pull_request_changes_state = GithubPullRequestChangesRouterState::new(
                 Arc::new(GithubPullRequestChangesServiceImpl::new(
                     GithubPullRequestServiceImpl::new(
@@ -741,7 +742,7 @@ pub async fn run() -> anyhow::Result<()> {
                         PgGithubPullRequestRepo::new(db.clone()),
                         S3GithubPullRequestPatchStore::new(
                             macro_aws_config::s3_client().await,
-                            config.github_pull_request_patch_bucket.to_string(),
+                            bucket.to_string(),
                         ),
                     ),
                 )),

@@ -1313,7 +1313,7 @@ async fn run() -> anyhow::Result<()> {
             GithubSyncClientImpl::default(),
         )),
         PgGithubPullRequestRepo::new(pool.clone()),
-        S3GithubPullRequestPatchStore::new(
+        S3GithubPullRequestPatchStore::new_optional(
             macro_aws_config::s3_client().await,
             config.github_pull_request_patch_bucket.clone(),
         ),

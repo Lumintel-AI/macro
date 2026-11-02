@@ -11,6 +11,7 @@ Omit unused credentials entirely. An explicitly configured remote secret must st
 | Dictation | `OPENAI_API_KEY` | HTTP 503. |
 | Task duplicate detection | `OPENAI_API_KEY`, `COHERE_API_KEY` | Similarity search returns 503; new tasks skip detection; saved matches remain readable. |
 | GitHub App | `GITHUB_SYNC_APP_URL`, `GITHUB_SYNC_APP_CLIENT_ID`, `GITHUB_SYNC_APP_CLIENT_SECRET`, `GITHUB_INSTALLATION_STATE_SECRET`, `GITHUB_WEBHOOK_SECRET_KEY`, `GITHUB_SYNC_APP_PEM_SECRET_KEY` | App routes and installation-token operations are unavailable. Stored pull request metadata remains readable. |
+| GitHub pull request patches | `GITHUB_PULL_REQUEST_PATCH_BUCKET` | Optional in DSS and the harness. Patch operations are unavailable without a bucket. |
 | GitHub account linking | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_IDP_ID` | OAuth operations are unavailable. |
 | Stripe | `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET_KEY` | Signups save no customer identity; payment operations are unavailable. Apply the `optional_stripe_customer` migration before these services. |
 | LiveKit | `LIVEKIT_SERVER_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` | Call routes return 503; persisted records remain usable. |
