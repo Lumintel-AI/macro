@@ -12,6 +12,7 @@ pub async fn receive_messages(
         .queue_url(queue_url)
         .wait_time_seconds(wait_time_seconds)
         .max_number_of_messages(max_messages)
+        .message_system_attribute_names(aws_sdk_sqs::types::MessageSystemAttributeName::All)
         .set_message_attribute_names(Some(vec!["*".to_string()])) // Needed to get all the message
         // attributes
         .send()

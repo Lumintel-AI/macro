@@ -1,0 +1,84 @@
+#[allow(
+    warnings,
+    reason = "RMME after PR https://github.com/macro-inc/macro-api/pull/1816"
+)]
+mod config;
+mod context;
+mod handler;
+mod models;
+mod service;
+use std::sync::Arc;
+
+use anyhow::Context;
+use aws_lambda_events::event::s3::S3Event;
+use config::Config;
+use handler::handler;
+use lambda_runtime::{
+    Error, LambdaEvent,
+    tracing::{self},
+};
+use macro_entrypoint::MacroEntrypoint;
+use macro_sha_count_client::Redis;
+use sqlx::postgres::PgPoolOptions;
+
+#[tokio::main]
+async fn main() -> Result<(), Error> {
+    let telemetry = MacroEntrypoint::default().init();
+
+    tracing::trace!("initiating lambda");
+
+    let config = Config::from_env().context("all necessary env vars should be available")?;
+
+    tracing::trace!("initialized config");
+
+    let db = PgPoolOptions::new()
+        .min_connections(1)
+        .max_connections(3)
+        .connect(&config.database_url)
+        .await
+        .context("could not connect to db")?;
+
+    tracing::trace!("initialized db connection");
+
+    let aws_config = macro_aws_config::get_macro_aws_config().await;
+
+    let s3_client = s3_client::S3::new(macro_aws_config::s3_client().await);
+    tracing::trace!("initialized s3 client");
+
+    let lambda_client = lambda_client::Lambda::new(aws_sdk_lambda::Client::new(&aws_config));
+    tracing::trace!("initialized lambda client");
+
+    let convert_queue = macro_queues::ConvertQueue::new();
+    let sqs_client =
+        sqs_client::SQS::new(aws_sdk_sqs::Client::new(&aws_config)).convert_queue(&convert_queue);
+    tracing::trace!("initialized sqs client");
+
+    let redis_client = redis::Client::open(config.redis_uri.clone())
+        .map_err(|e| anyhow::Error::msg(format!("unable to connect to redis {:?}", e)))
+        .context("could not connect to redis client")?;
+    if let Err(e) = redis_client.get_connection() {
+        tracing::error!(error=?e, "unable to connect to redis");
+        return Err(e.into());
+    }
+    let redis_client = Redis::new(redis_client);
+
+    let context = context::Context {
+        db,
+        s3_client: Arc::new(s3_client),
+        lambda_client: Arc::new(lambda_client),
+        redis_client: Arc::new(redis_client),
+        sqs_client: Arc::new(sqs_client),
+        config,
+    };
+
+    let func = move |event: LambdaEvent<S3Event>| {
+        let context = context.clone();
+
+        async move { handler(context, event).await }
+    };
+
+    let result =
+        sqs_worker::standalone::run_queue(func, sqs_worker::standalone::EventFormat::S3).await;
+    telemetry.shutdown();
+    result
+}

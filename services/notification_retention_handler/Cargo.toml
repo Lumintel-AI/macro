@@ -4,7 +4,12 @@ name = "notification_retention_handler"
 publish = false
 version = "0.1.0"
 
+[[bin]]
+name = "notification_retention_handler_vm"
+path = "src/vm.rs"
+
 [dependencies]
+sqs_worker = { path = "../../crates/sqs_worker" }
 lambda_runtime = { workspace = true }
 macro_entrypoint = { path = "../../crates/macro_entrypoint" }
 macro_env_var = { path = "../../crates/macro_env_var" }

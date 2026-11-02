@@ -8,7 +8,7 @@ settings and enqueues one SQS message per organization.
 
 ## Start here
 
-- `src/main.rs`: the whole Lambda — handler, DB pool, SQS client wiring.
+- `src/handler.rs`: organization fan-out. `src/main.rs` wires the Lambda DB pool and SQS client.
 - `src/service/db/get_organization_retention.rs`: the query that reads
   retention settings.
 
@@ -31,3 +31,7 @@ settings and enqueues one SQS message per organization.
 ## Related
 
 - Rules: `.agents/rules/rust/guardrails.md`
+
+## VM execution
+
+`organization_retention_trigger_vm` in `src/vm.rs` shares the Lambda handler. Run once per systemd timer. A handler failure exits nonzero. The timer must prevent overlapping runs.

@@ -20,3 +20,7 @@ and enqueues delete messages for the SFS delete worker.
 ## Checks
 
 - `cargo test -p email_sfs_delete_handler` (`SQLX_OFFLINE` unset).
+
+## VM execution
+
+`email_sfs_delete_handler_vm` in `src/vm.rs` shares the Lambda handler. Run once per systemd timer. A handler failure exits nonzero. The timer must prevent overlapping runs.

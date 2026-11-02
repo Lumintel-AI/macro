@@ -36,3 +36,7 @@ converts their XML parts into a Bill Of Materials (BOM) stored in MacroDB.
 
 - Do not build this crate for deployment from this directory — use the repo's
   Lambda build path (`make build` here targets the Lambda release artifact).
+
+## VM execution
+
+`docx_unzip_handler_vm` in `src/vm.rs` shares the Lambda handler. Set `VM_QUEUE_URL` to its dedicated SQS queue. The shared poller owns visibility renewal, acknowledgement and shutdown. Failures remain on the queue for redrive.

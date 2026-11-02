@@ -40,3 +40,7 @@ MacroDB, feeding search and citations elsewhere.
 - Build this crate's `local`/`local-extract` features only for local
   iteration — the deployed binary is built via the `just ... /build` recipe,
   not `cargo build` from this directory.
+
+## VM execution
+
+`document_text_extractor_vm` in `src/vm.rs` shares the Lambda handler. Set `VM_QUEUE_URL` to its dedicated SQS queue. The shared poller owns visibility renewal, acknowledgement and shutdown. Failures remain on the queue for redrive.

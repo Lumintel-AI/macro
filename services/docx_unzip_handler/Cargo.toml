@@ -5,7 +5,12 @@ name = "docx_unzip_handler"
 publish = false
 version = "0.1.0"
 
+[[bin]]
+name = "docx_unzip_handler_vm"
+path = "src/vm.rs"
+
 [dependencies]
+sqs_worker = { path = "../../crates/sqs_worker" }
 anyhow = { workspace = true }
 aws-sdk-lambda = { workspace = true }
 macro_aws_config = { path = "../../crates/macro_aws_config", features = ["s3"] }

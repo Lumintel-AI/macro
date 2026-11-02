@@ -4,7 +4,12 @@ name = "search_upload_handler"
 publish = false
 version = "0.1.0"
 
+[[bin]]
+name = "search_upload_handler_vm"
+path = "src/vm.rs"
+
 [dependencies]
+sqs_worker = { path = "../../crates/sqs_worker" }
 anyhow = { workspace = true }
 aws_lambda_events = { workspace = true, features = ["eventbridge"] }
 document_storage_service_client = { path = "../../crates/document_storage_service_client" }

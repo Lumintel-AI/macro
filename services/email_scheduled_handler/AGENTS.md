@@ -28,3 +28,7 @@ publishes a `ScheduledPubsubMessage` for the email worker to process.
 - #6617 reverted a "replay historical sends" change and #6580 fixed a send
   stranded by a failed enqueue — read those commits before changing the
   fetch/publish ordering (`git log -- services/email_scheduled_handler`).
+
+## VM execution
+
+`email_scheduled_handler_vm` in `src/vm.rs` shares the Lambda handler. Run once per systemd timer. A handler failure exits nonzero. The timer must prevent overlapping runs.

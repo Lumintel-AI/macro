@@ -4,7 +4,12 @@ name = "delete_chat_handler"
 publish = false
 version = "0.1.0"
 
+[[bin]]
+name = "delete_chat_handler_vm"
+path = "src/vm.rs"
+
 [dependencies]
+sqs_worker = { path = "../../crates/sqs_worker" }
 anyhow = { workspace = true }
 aws_lambda_events = { workspace = true, features = ["sqs"] }
 lambda_runtime = { workspace = true }

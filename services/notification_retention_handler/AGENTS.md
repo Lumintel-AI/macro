@@ -33,3 +33,7 @@ Internal scheduled notification cleanup. The owning notification domain enforces
 
 - `docs/runbooks/notification-retention.md`
 - `.agents/rules/observability.md`
+
+## VM execution
+
+`notification_retention_handler_vm` in `src/vm.rs` shares the Lambda handler. Run once per systemd timer. A handler failure exits nonzero. The timer must prevent overlapping runs.

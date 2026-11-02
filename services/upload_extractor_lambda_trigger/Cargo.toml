@@ -4,7 +4,12 @@ name = "upload_extractor_lambda_trigger"
 publish = false
 version = "0.1.0"
 
+[[bin]]
+name = "upload_extractor_lambda_trigger_vm"
+path = "src/vm.rs"
+
 [dependencies]
+sqs_worker = { path = "../../crates/sqs_worker" }
 anyhow = { workspace = true }
 aws-sdk-sqs = { workspace = true }
 aws_lambda_events = { workspace = true, features = ["eventbridge", "s3"] }

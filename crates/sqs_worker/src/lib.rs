@@ -1,3 +1,6 @@
+/// Standalone execution adapters for Lambda handlers on VMs.
+pub mod standalone;
+
 mod change_message_visibility;
 mod delete_message;
 mod receive_messages;

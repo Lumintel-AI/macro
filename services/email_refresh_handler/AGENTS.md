@@ -22,3 +22,7 @@ day) by enqueuing `LinkManagerMessage`s for `email_service` to process.
 ## Checks
 
 - `cargo test -p email_refresh_handler` (`SQLX_OFFLINE` unset).
+
+## VM execution
+
+`email_refresh_handler_vm` in `src/vm.rs` shares the Lambda handler. Run once per systemd timer. A handler failure exits nonzero. The timer must prevent overlapping runs.

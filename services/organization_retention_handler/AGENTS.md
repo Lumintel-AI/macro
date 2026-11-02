@@ -38,3 +38,7 @@ than an organization's retention window, and enqueues them for deletion.
 ## Related
 
 - Rules: `.agents/rules/rust/guardrails.md`
+
+## VM execution
+
+`organization_retention_handler_vm` in `src/vm.rs` shares the Lambda handler. Set `VM_QUEUE_URL` to its dedicated SQS queue. The shared poller owns visibility renewal, acknowledgement and shutdown. Failures remain on the queue for redrive.

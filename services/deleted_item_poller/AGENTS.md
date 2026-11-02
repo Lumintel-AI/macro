@@ -35,3 +35,7 @@ them for permanent deletion.
 ## Related
 
 - Rules: `.agents/rules/rust/db.md`
+
+## VM execution
+
+`deleted_item_poller_vm` in `src/vm.rs` shares the Lambda handler. Run once per systemd timer. A handler failure exits nonzero. The timer must prevent overlapping runs.

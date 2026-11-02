@@ -1,3 +1,5 @@
+mod handler;
+use handler::handler;
 use std::sync::Arc;
 
 mod service;
@@ -14,23 +16,6 @@ use sqlx::postgres::PgPoolOptions;
 
 env_vars! {
     struct DatabaseUrl;
-}
-
-#[tracing::instrument(skip(db, sqs_client, event))]
-async fn handler(
-    db: Arc<service::db::DB>,
-    sqs_client: Arc<sqs_client::SQS>,
-    event: LambdaEvent<EventBridgeEvent<serde_json::Value>>,
-) -> Result<(), Error> {
-    tracing::trace!("processing event {:?}", event.payload.id);
-
-    let organizations = db.get_organization_retention().await?;
-
-    sqs_client
-        .bulk_enqueue_organization_retention(organizations)
-        .await?;
-
-    Ok(())
 }
 
 #[tokio::main]

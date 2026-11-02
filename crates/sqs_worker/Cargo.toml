@@ -5,7 +5,20 @@ publish = false
 version = "0.1.0"
 
 [dependencies]
+base64 = { workspace = true }
+chrono = { workspace = true }
+lambda_runtime = { workspace = true }
+macro_aws_config = { path = "../macro_aws_config" }
+macro_entrypoint = { path = "../macro_entrypoint" }
+macro_env_var = { path = "../macro_env_var" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+urlencoding = { workspace = true }
 anyhow = { workspace = true }
 aws-sdk-sqs = { workspace = true }
 tracing = { workspace = true }
 workspace-hack = { version = "0.1", path = "../workspace-hack" }
+
+[dev-dependencies]
+aws_lambda_events = { workspace = true, features = ["sqs", "sns", "eventbridge"] }

@@ -7,7 +7,12 @@ version = "0.1.0"
 [features]
 local = []
 
+[[bin]]
+name = "upload_extractor_lambda_handler_vm"
+path = "src/vm.rs"
+
 [dependencies]
+sqs_worker = { path = "../../crates/sqs_worker" }
 anyhow = { workspace = true }
 aws-sdk-s3 = { workspace = true }
 aws-sdk-sqs = { workspace = true }

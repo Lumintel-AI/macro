@@ -1,5 +1,7 @@
+mod handler;
 use anyhow::Context;
 use aws_lambda_events::event::eventbridge::EventBridgeEvent;
+use handler::handler;
 use lambda_runtime::{
     Error, LambdaEvent, run, service_fn,
     tracing::{self},
@@ -35,12 +37,4 @@ async fn main() -> Result<(), Error> {
     });
 
     run(func).await
-}
-
-pub async fn handler(db: sqlx::PgPool, _event: LambdaEvent<EventBridgeEvent>) -> Result<(), Error> {
-    macro_db_client::in_progress_user_link::delete_day_old_in_progress_user_links(&db).await?;
-
-    macro_db_client::in_progress_email_link::delete_day_old_in_progress_email_links(&db).await?;
-
-    Ok(())
 }

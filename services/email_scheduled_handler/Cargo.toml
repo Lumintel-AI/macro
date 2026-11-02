@@ -4,7 +4,12 @@ name = "email_scheduled_handler"
 publish = false
 version = "0.1.0"
 
+[[bin]]
+name = "email_scheduled_handler_vm"
+path = "src/vm.rs"
+
 [dependencies]
+sqs_worker = { path = "../../crates/sqs_worker" }
 anyhow = { workspace = true }
 aws-sdk-sqs = { workspace = true }
 macro_aws_config = { path = "../../crates/macro_aws_config" }
