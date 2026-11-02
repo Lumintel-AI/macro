@@ -90,3 +90,8 @@ pub enum DeviceEndpoint {
 #[derive(Debug, thiserror::Error)]
 #[error("push endpoint is disabled or no longer exists")]
 pub struct PushEndpointUnavailable;
+
+/// Mobile push was not configured by this deployment.
+#[derive(Debug, thiserror::Error)]
+#[error("mobile push is not configured")]
+pub struct MobilePushUnconfigured;

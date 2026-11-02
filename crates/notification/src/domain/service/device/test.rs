@@ -691,3 +691,34 @@ fn existing_device_registration_payloads_default_to_no_native_call_capability() 
         .unwrap();
     assert!(!request.native_call_capable);
 }
+
+#[tokio::test]
+async fn unconfigured_mobile_registration_does_not_mutate_devices() {
+    let service = NotificationReaderService {
+        repository: MockNotifRepo::with_existing_endpoint("arn:existing"),
+        queue: MockQueue,
+        sns_endpoint: MockSnsManager::new(),
+        platform_config: None::<PlatformArnConfig>,
+        realtime: crate::domain::ports::NoopNotificationRealtimePublisher,
+    };
+    for device_type in [DeviceType::Ios, DeviceType::Android, DeviceType::IosVoip] {
+        let error = service
+            .register_device(test_user_id(), "device-token", &device_type, false)
+            .await
+            .unwrap_err();
+        assert!(
+            error
+                .downcast_current_context::<crate::domain::models::mobile::MobilePushUnconfigured>()
+                .is_some()
+        );
+    }
+    assert!(service.repository.upserted.lock().unwrap().is_empty());
+    assert!(
+        service
+            .repository
+            .stale_delete_calls
+            .lock()
+            .unwrap()
+            .is_empty()
+    );
+}

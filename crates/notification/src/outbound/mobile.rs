@@ -259,3 +259,39 @@ impl<P: MobilePushOps + Send + Sync + 'static> crate::domain::ports::VoipPushDel
         MobilePushAdapter::send_voip_push(self, endpoint_arn, recipient_id, payload).await
     }
 }
+
+/// Selects configured mobile delivery or an explicit configuration error.
+/// Other notification channels use their own adapters.
+pub struct OptionalMobilePushAdapter<P>(pub Option<MobilePushAdapter<P>>);
+
+impl<P: MobilePushOps + Send + Sync + 'static> NotificationSender for OptionalMobilePushAdapter<P> {
+    async fn send_ios_push_notification<T: Serialize + Send + Sync>(
+        &self,
+        endpoint_arn: &str,
+        notification: &APNSPushNotification<T>,
+        attributes: &MessageAttributes,
+    ) -> Result<String, Report> {
+        self.0
+            .as_ref()
+            .ok_or_else(|| {
+                rootcause::report!(crate::domain::models::mobile::MobilePushUnconfigured)
+            })?
+            .send_ios_push_notification(endpoint_arn, notification, attributes)
+            .await
+    }
+
+    async fn send_android_push_notification<T: Serialize + Send + Sync>(
+        &self,
+        endpoint_arn: &str,
+        notification: &FCMMessage<T>,
+        attributes: &MessageAttributes,
+    ) -> Result<String, Report> {
+        self.0
+            .as_ref()
+            .ok_or_else(|| {
+                rootcause::report!(crate::domain::models::mobile::MobilePushUnconfigured)
+            })?
+            .send_android_push_notification(endpoint_arn, notification, attributes)
+            .await
+    }
+}

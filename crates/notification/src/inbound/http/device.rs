@@ -42,6 +42,16 @@ async fn register_device<S: NotificationReader, Auth: MacroAuthorizationService>
         .await
         .map_err(|e| {
             tracing::error!(error=?e, "failed to register device");
+            if e.downcast_current_context::<crate::domain::models::mobile::MobilePushUnconfigured>()
+                .is_some()
+            {
+                return (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Json(ErrorResponse {
+                        message: "mobile push is not configured".into(),
+                    }),
+                );
+            }
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ErrorResponse {

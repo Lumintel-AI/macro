@@ -16,6 +16,7 @@ mod voip;
 use thiserror::Error;
 
 pub use egress::NotificationEgressService;
+pub use ingress::DevicePlatformConfig;
 pub use ingress::NotificationIngress;
 pub use ingress::NotificationIngressService;
 pub use ingress::NotificationReader;

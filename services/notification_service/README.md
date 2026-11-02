@@ -30,3 +30,16 @@ To reset your local database, run the following commands:
 ```bash
 sqlx database drop -y
 ```
+
+## Optional mobile push
+
+Production startup supports deployments without mobile applications. Leave
+`APPLE_BUNDLE_ID`, `SNS_APNS_PLATFORM_ARN`, `SNS_FCM_PLATFORM_ARN` and
+`SNS_APNS_VOIP_PLATFORM_ARN` absent or blank to disable mobile push. Set all four
+to enable the existing SNS adapters. Partial configuration fails before the
+service opens database or AWS connections.
+
+Without mobile configuration, device registration returns HTTP 503 with
+`mobile push is not configured`. Mobile delivery returns the same typed error
+through the notification port. Existing gateway delivery and email digest
+processing continue. Disabling mobile push does not delete saved devices.

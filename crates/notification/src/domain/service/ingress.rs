@@ -477,11 +477,43 @@ pub struct PlatformArnConfig {
     pub apns_voip_platform_arn: String,
 }
 
+/// Resolves the mobile platform configured for device registration.
+pub trait DevicePlatformConfig: Send + Sync + 'static {
+    /// Return a platform ARN, or a configuration error before any device mutation.
+    fn platform_arn(&self, device_type: &DeviceType) -> Result<&str, Report>;
+}
+
+impl DevicePlatformConfig for PlatformArnConfig {
+    fn platform_arn(&self, device_type: &DeviceType) -> Result<&str, Report> {
+        Ok(match device_type {
+            DeviceType::Ios => &self.apns_platform_arn,
+            DeviceType::Android => &self.fcm_platform_arn,
+            DeviceType::IosVoip => &self.apns_voip_platform_arn,
+        })
+    }
+}
+
+impl DevicePlatformConfig for Option<PlatformArnConfig> {
+    fn platform_arn(&self, device_type: &DeviceType) -> Result<&str, Report> {
+        self.as_ref()
+            .ok_or_else(|| {
+                rootcause::report!(crate::domain::models::mobile::MobilePushUnconfigured)
+            })?
+            .platform_arn(device_type)
+    }
+}
+
 /// Service for reading and updating notifications.
 ///
 /// Handles notification queries, status updates, and deletion.
 /// Does not require a bulk-digest state machine.
-pub struct NotificationReaderService<N, Q, S, R = NoopNotificationRealtimePublisher> {
+pub struct NotificationReaderService<
+    N,
+    Q,
+    S,
+    R = NoopNotificationRealtimePublisher,
+    C = PlatformArnConfig,
+> {
     /// Notification repository.
     pub repository: N,
     /// Queue used to enqueue notification work.
@@ -489,17 +521,18 @@ pub struct NotificationReaderService<N, Q, S, R = NoopNotificationRealtimePublis
     /// SNS endpoint manager.
     pub sns_endpoint: S,
     /// Platform ARN configuration.
-    pub platform_config: PlatformArnConfig,
+    pub platform_config: C,
     /// Realtime update publisher.
     pub realtime: R,
 }
 
-impl<N, Q, S, R> NotificationReaderService<N, Q, S, R>
+impl<N, Q, S, R, C> NotificationReaderService<N, Q, S, R, C>
 where
     N: NotificationRepository,
     Q: NotificationQueue,
     S: SnsEndpointManager,
     R: NotificationRealtimePublisher,
+    C: DevicePlatformConfig,
 {
     /// Update notification status for a user and optionally enqueue push notification clearing.
     ///
@@ -680,12 +713,13 @@ fn deserialize_updated_notifications<T: DeserializeOwned>(
         .collect())
 }
 
-impl<N, Q, S, R> NotificationReader for NotificationReaderService<N, Q, S, R>
+impl<N, Q, S, R, C> NotificationReader for NotificationReaderService<N, Q, S, R, C>
 where
     N: NotificationRepository,
     Q: NotificationQueue,
     S: SnsEndpointManager,
     R: NotificationRealtimePublisher,
+    C: DevicePlatformConfig,
 {
     async fn update_notifications(
         &self,
@@ -859,11 +893,7 @@ where
         device_type: &DeviceType,
         native_call_capable: bool,
     ) -> Result<(), Report> {
-        let platform_arn: &str = match device_type {
-            DeviceType::Ios => self.platform_config.apns_platform_arn.as_str(),
-            DeviceType::Android => self.platform_config.fcm_platform_arn.as_str(),
-            DeviceType::IosVoip => self.platform_config.apns_voip_platform_arn.as_str(),
-        };
+        let platform_arn = self.platform_config.platform_arn(device_type)?;
 
         // Get endpoint if exists, otherwise create new one
         let endpoint = match self

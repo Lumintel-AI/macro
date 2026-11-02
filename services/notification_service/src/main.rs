@@ -10,7 +10,7 @@ use ::notification::outbound::fanout_notification_realtime::FanoutNotificationRe
 use ::notification::outbound::fanout_realtime::FanoutRealtimeSender;
 use ::notification::outbound::kafka_notification_realtime::KafkaNotificationRealtimePublisher;
 use ::notification::outbound::kafka_realtime::KafkaRealtimeSender;
-use ::notification::outbound::mobile::MobilePushAdapter;
+use ::notification::outbound::mobile::{MobilePushAdapter, OptionalMobilePushAdapter};
 use ::notification::outbound::notification_events::PgNotificationEventsReceiver;
 use ::notification::outbound::rate_limit::RedisRateLimitAdapter;
 use ::notification::outbound::websocket::{ConnectionGatewayClient, WebSocketGatewayAdapter};
@@ -47,6 +47,11 @@ pub async fn main() -> anyhow::Result<()> {
     let config = Config::from_env().context("expected to be able to generate config")?;
 
     tracing::trace!("initialized config");
+    let mobile_config = config.mobile_push_config()?;
+    tracing::info!(
+        mobile_push_configured = mobile_config.is_some(),
+        "initialized mobile push configuration"
+    );
 
     let (min_connections, max_connections): (u32, u32) = match config.environment {
         Environment::Production => (5, 30),
@@ -159,11 +164,6 @@ pub async fn main() -> anyhow::Result<()> {
         ::notification::outbound::sns_endpoint::SnsEndpointManagerAdapter::new(
             aws_sdk_sns::Client::new(&aws_config),
         );
-    let platform_config = ::notification::domain::service::PlatformArnConfig {
-        apns_platform_arn: config.sns_apns_platform_arn.as_ref().to_string(),
-        fcm_platform_arn: config.sns_fcm_platform_arn.as_ref().to_string(),
-        apns_voip_platform_arn: config.sns_apns_voip_platform_arn().to_string(),
-    };
     let realtime_event_broker = MacroEventBrokerService::new(
         KafkaEventPublisher::new(config.kafka_brokers.as_ref())
             .context("failed to create Kafka realtime notification publisher")?,
@@ -201,7 +201,13 @@ pub async fn main() -> anyhow::Result<()> {
         repository: notification_repository,
         queue: notification_queue.clone(),
         sns_endpoint: sns_endpoint_manager,
-        platform_config,
+        platform_config: mobile_config.as_ref().map(|config| {
+            ::notification::domain::service::PlatformArnConfig {
+                apns_platform_arn: config.platforms.apns_platform_arn.clone(),
+                fcm_platform_arn: config.platforms.fcm_platform_arn.clone(),
+                apns_voip_platform_arn: config.platforms.apns_voip_platform_arn.clone(),
+            }
+        }),
         realtime: reader_realtime_adapter,
     };
     let ingress_state = ::notification::inbound::http::NotificationRouterState::new(
@@ -225,11 +231,11 @@ pub async fn main() -> anyhow::Result<()> {
         KafkaRealtimeSender::new(realtime_event_broker),
     );
 
-    let mobile_adapter = MobilePushAdapter {
+    let mobile_adapter = OptionalMobilePushAdapter(mobile_config.map(|config| MobilePushAdapter {
         push_service: aws_sdk_sns::Client::new(&aws_config),
-        apns_bundle_id: config.apple_bundle_id.as_ref().to_string(),
+        apns_bundle_id: config.bundle_id,
         voip_bundle_id: None,
-    };
+    }));
 
     let ses_client = aws_sdk_sesv2::Client::new(&aws_config);
     let email_adapter = EmailAdapter::new(ses_client, crate::env::SENDER_ADDRESS.clone());

@@ -3222,3 +3222,48 @@ fn email_destination_cannot_redirect_multiple_or_unrelated_recipients() {
         );
     }
 }
+
+#[tokio::test]
+async fn unconfigured_mobile_push_preserves_email_and_gateway_delivery() {
+    let NotificationEgressService {
+        queue,
+        repository,
+        realtime,
+        email,
+        rate_limiter,
+        state_machine,
+        digest_batcher,
+        ..
+    } = create_egress_service(allowing_rate_limiter());
+    let service = NotificationEgressService {
+        queue,
+        repository,
+        realtime,
+        email,
+        rate_limiter,
+        state_machine,
+        digest_batcher,
+        mobile: crate::outbound::mobile::OptionalMobilePushAdapter::<aws_sdk_sns::Client>(None),
+    };
+    let email = EmailCreateBundle::new(&TestNotification {
+        message: "Hello".into(),
+    })
+    .with_recipient(test_user_id("user@example.com"));
+    let gateway = ConnGatewayNotification {
+        notif: create_mock_notif(TestNotification {
+            message: "Hello".into(),
+        }),
+        recipients: vec![test_user_id("user@example.com")],
+    }
+    .testing_to_value();
+    for channel in [
+        NotificationChannel::Email(email),
+        NotificationChannel::ConnGateway(gateway),
+    ] {
+        let results = service
+            .deliver_notification(QueueMessage::new_test("test_notification".into(), channel))
+            .await;
+        assert_eq!(results.len(), 1);
+        assert!(results[0].is_ok());
+    }
+}
