@@ -119,6 +119,12 @@ impl From<AgentStreamFailure<'_>> for StreamError {
             model,
         } = failure;
         let stream_id = stream_id.to_string();
+        if matches!(error, AgentError::ProviderUnavailable(_)) {
+            return Self::ProviderError {
+                stream_id,
+                model: model.to_owned(),
+            };
+        }
         match error.completion_error() {
             Some(CompletionError::ProviderError(msg) | CompletionError::ResponseError(msg))
                 if is_context_overflow(msg) =>

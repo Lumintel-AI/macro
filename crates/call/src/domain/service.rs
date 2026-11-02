@@ -932,7 +932,7 @@ impl<
                             voip_push_sender: self.voip_push_sender.clone(),
                             server_url: self.server_url.clone().ok_or_else(|| {
                                 CallError::Internal(anyhow::anyhow!(
-                                    "LiveKit is unavailable: integration is not configured"
+                                    "LiveKit is unavailable. The integration is not configured"
                                 ))
                             })?,
                             ring_status_base_url: self.ring_status_base_url.clone(),
@@ -1010,7 +1010,7 @@ impl<
             room_name: call.room_name,
             server_url: self.server_url.clone().ok_or_else(|| {
                 CallError::Internal(anyhow::anyhow!(
-                    "LiveKit is unavailable: integration is not configured"
+                    "LiveKit is unavailable. The integration is not configured"
                 ))
             })?,
         })

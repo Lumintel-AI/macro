@@ -15,10 +15,10 @@ maybe_env_vars! {
 
 /// The delivery capability conversion and unzip jobs require.
 pub trait JobUpdateSender: Send + Sync {
-    /// Deliver the original job result to its document's subscribers.
+    /// Deliver the original result. Lambda does not require a document id.
     fn send<T: serde::Serialize + std::fmt::Debug + Sync>(
         &self,
-        document_id: &str,
+        document_id: Option<&str>,
         result: &T,
     ) -> impl Future<Output = anyhow::Result<()>> + Send;
 }
@@ -114,12 +114,12 @@ impl JobUpdateSender for JobUpdateDelivery {
     #[tracing::instrument(
         name = "document_job.deliver_status",
         skip_all,
-        fields(document_id),
+        fields(document_id = ?document_id),
         err
     )]
     async fn send<T: serde::Serialize + std::fmt::Debug + Sync>(
         &self,
-        document_id: &str,
+        document_id: Option<&str>,
         result: &T,
     ) -> anyhow::Result<()> {
         match self {
@@ -128,6 +128,8 @@ impl JobUpdateSender for JobUpdateDelivery {
                 function_name,
             } => client.invoke_event(function_name, result).await,
             Self::Gateway(client) => {
+                let document_id =
+                    document_id.context("connection-gateway job updates require a document id")?;
                 client
                     .send_job_update(document_id, serde_json::to_value(result)?)
                     .await?;

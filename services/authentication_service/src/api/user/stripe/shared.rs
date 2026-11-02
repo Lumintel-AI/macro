@@ -52,7 +52,7 @@ impl StripePrices {
 /// Shared error type for Stripe operations
 #[derive(Debug, Error)]
 pub enum StripeOperationError {
-    #[error("Stripe is unavailable: integration is not configured")]
+    #[error("Stripe is unavailable. The integration is not configured")]
     Unavailable,
     #[error("Failed to parse user id")]
     ParseId(#[from] macro_user_id::error::ParseErr),

@@ -53,7 +53,6 @@ pub async fn handler(ctx: Context, event: LambdaEvent<S3Event>) -> Result<(), Er
                 .await;
 
                 result?;
-                return Err(err.into());
             }
         }
     }

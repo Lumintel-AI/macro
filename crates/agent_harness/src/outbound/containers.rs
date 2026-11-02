@@ -60,7 +60,7 @@ impl ContainerManager for HarnessContainers {
         command: SpawnContainer,
     ) -> Result<agent_session::domain::connection::RuntimeAttachment<Self::Transport>> {
         match self {
-            Self::Unconfigured => Err(HarnessError::Container("managed agents are unavailable: DAYTONA_API_KEY and ANTHROPIC_API_KEY are not configured; connect macrod for subscription sessions".into())),
+            Self::Unconfigured => Err(HarnessError::Container("managed agents are unavailable. DAYTONA_API_KEY and ANTHROPIC_API_KEY are not configured; connect macrod for subscription sessions".into())),
             Self::Daytona(manager) => manager
                 .spawn(command)
                 .await
@@ -83,7 +83,7 @@ impl ContainerManager for HarnessContainers {
     async fn resize(&self, session: AgentSessionId, size: SandboxSize) -> Result<()> {
         match self {
             Self::Unconfigured => Err(HarnessError::Container(
-                "managed agents are unavailable: integration is not configured".into(),
+                "managed agents are unavailable. The integration is not configured".into(),
             )),
             Self::Daytona(manager) => manager.resize(session, size).await,
             Self::Local(manager) => manager.resize(session, size).await,
@@ -96,7 +96,7 @@ impl ContainerManager for HarnessContainers {
     ) -> Result<agent_session::domain::connection::RuntimeAttachment<Self::Transport>> {
         match self {
             Self::Unconfigured => Err(HarnessError::Container(
-                "managed agents are unavailable: integration is not configured".into(),
+                "managed agents are unavailable. The integration is not configured".into(),
             )),
             Self::Daytona(manager) => manager
                 .resume(session)

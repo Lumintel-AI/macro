@@ -31,7 +31,7 @@ impl IntoResponse for EnrichGithubPullRequestsProxyError {
         let (status_code, message) = match &self {
             Self::Github(GithubError::Unavailable) => (
                 StatusCode::SERVICE_UNAVAILABLE,
-                "GitHub is unavailable: integration is not configured".into(),
+                "GitHub is unavailable. The integration is not configured".into(),
             ),
             Self::Github(GithubError::NoLinkFound) => {
                 (StatusCode::NOT_FOUND, "no github link found")
@@ -67,7 +67,7 @@ impl IntoResponse for MergeGithubPullRequestError {
         let (status_code, message) = match self {
             Self::Github(GithubError::Unavailable) => (
                 StatusCode::SERVICE_UNAVAILABLE,
-                "GitHub is unavailable: integration is not configured".into(),
+                "GitHub is unavailable. The integration is not configured".into(),
             ),
             Self::Github(GithubError::NoLinkFound) => {
                 (StatusCode::NOT_FOUND, "no github link found".to_string())
@@ -111,7 +111,7 @@ impl IntoResponse for UpdateGithubPullRequestError {
         let (status_code, message) = match self {
             Self::Github(GithubError::Unavailable) => (
                 StatusCode::SERVICE_UNAVAILABLE,
-                "GitHub is unavailable: integration is not configured".into(),
+                "GitHub is unavailable. The integration is not configured".into(),
             ),
             Self::Github(GithubError::NoLinkFound) => {
                 (StatusCode::NOT_FOUND, "no github link found".to_string())

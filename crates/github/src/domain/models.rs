@@ -52,7 +52,7 @@ pub use webhook_delivery::{
 #[derive(Debug, thiserror::Error)]
 pub enum GithubError {
     /// Deployment credentials for this integration are absent.
-    #[error("GitHub is unavailable: integration is not configured")]
+    #[error("GitHub is unavailable. The integration is not configured")]
     Unavailable,
     /// An internal error occurred.
     #[error("{0}")]

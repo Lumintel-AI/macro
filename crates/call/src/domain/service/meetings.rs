@@ -398,7 +398,7 @@ impl<
             room_name: call.room_name,
             server_url: self.server_url.clone().ok_or_else(|| {
                 CallError::Internal(anyhow::anyhow!(
-                    "LiveKit is unavailable: integration is not configured"
+                    "LiveKit is unavailable. The integration is not configured"
                 ))
             })?,
             participant_id: actor.to_string(),
@@ -447,7 +447,7 @@ impl<
             room_name: call.room_name,
             server_url: self.server_url.clone().ok_or_else(|| {
                 CallError::Internal(anyhow::anyhow!(
-                    "LiveKit is unavailable: integration is not configured"
+                    "LiveKit is unavailable. The integration is not configured"
                 ))
             })?,
             participant_id: guest_id.to_string(),

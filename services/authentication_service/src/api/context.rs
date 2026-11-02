@@ -299,13 +299,13 @@ impl ApiContext {
     }
 
     pub(crate) fn stripe_client(&self) -> anyhow::Result<&stripe::Client> {
-        self.stripe_client
-            .as_deref()
-            .ok_or_else(|| anyhow::anyhow!("Stripe is unavailable: integration is not configured"))
+        self.stripe_client.as_deref().ok_or_else(|| {
+            anyhow::anyhow!("Stripe is unavailable. The integration is not configured")
+        })
     }
     pub(crate) fn stripe_prices(&self) -> anyhow::Result<&crate::api::user::stripe::StripePrices> {
         self.stripe_prices.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("Stripe prices are unavailable: integration is not configured")
+            anyhow::anyhow!("Stripe prices are unavailable. The integration is not configured")
         })
     }
 }

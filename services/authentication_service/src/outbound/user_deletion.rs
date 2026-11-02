@@ -214,7 +214,7 @@ impl<T: TeamService, O: OnboardingRepo> UserDeletionGateway for UserDeletionAdap
         };
 
         let stripe = self.stripe.as_ref().ok_or_else(|| {
-            rootcause::report!("Stripe is unavailable: cannot delete an existing Stripe customer")
+            rootcause::report!("Stripe is unavailable. Cannot delete an existing Stripe customer")
         })?;
         stripe::Customer::delete(stripe, &customer_id)
             .await

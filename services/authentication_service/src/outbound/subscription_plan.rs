@@ -23,12 +23,12 @@ impl<C> StripePlanGateway<C> {
     /// Inject customer storage, provider client and billing domain capabilities.
     fn stripe(&self) -> Result<&stripe::Client, PlanChangeError> {
         self.stripe.as_deref().ok_or_else(|| {
-            anyhow::anyhow!("Stripe is unavailable: integration is not configured").into()
+            anyhow::anyhow!("Stripe is unavailable. The integration is not configured").into()
         })
     }
     fn prices(&self) -> Result<&SeatPrices, PlanChangeError> {
         self.prices.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("Stripe is unavailable: integration is not configured").into()
+            anyhow::anyhow!("Stripe is unavailable. The integration is not configured").into()
         })
     }
 

@@ -8,8 +8,7 @@ mod test;
 
 /// The stub `STRIPE_SECRET_KEY` set by `run_local --no-doppler` (see
 /// `tooling/xtask/crates/xtask_local/src/local/local_env.rs`). With this key a
-/// real Stripe call would fail, so local signups skip it and store a
-/// deterministic placeholder only in the required legacy account field.
+/// real Stripe call would fail, so local signups leave billing identities absent.
 const LOCAL_STRIPE_SECRET_STUB: &str = "local-stripe-secret";
 
 fn is_local_stripe_stub() -> bool {
@@ -34,9 +33,9 @@ pub async fn create_user(
     stripe_client: Option<&stripe::Client>,
 ) -> anyhow::Result<(String, Option<i32>)> {
     let stripe_customer_id = if stripe_client.is_none() || is_local_stripe_stub() {
-        // Local mode uses a stub key; don't call Stripe (it would 401 and
-        // abort the transactional user.create webhook, blocking all signups).
-        tracing::info!("skipping Stripe customer creation for the local Stripe stub");
+        tracing::info!(
+            "Stripe customer creation is not configured; creating an account without billing"
+        );
         None
     } else {
         // NOTE: stripe adds in ~400ms of latency to this request. We may want to update our

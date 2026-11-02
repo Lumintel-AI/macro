@@ -162,7 +162,7 @@ fn api_router(state: ApiContext) -> Router {
         .merge(sync::router())
         .nest(
             "/dictation",
-            state.dictation_state.clone().map(dictation::inbound::axum_router::dictation_router).unwrap_or_else(|| unavailable_router("Dictation: OPENAI_API_KEY is not configured")),
+            state.dictation_state.clone().map(dictation::inbound::axum_router::dictation_router).unwrap_or_else(|| unavailable_router("Dictation")),
         )
         .nest(
             "/github",
@@ -445,6 +445,6 @@ fn api_router(state: ApiContext) -> Router {
 /// Keep disabled integration routes explicit and return an actionable response.
 fn unavailable_router<S: Clone + Send + Sync + 'static>(integration: &'static str) -> Router<S> {
     Router::new().fallback(move || async move {
-        (axum::http::StatusCode::SERVICE_UNAVAILABLE, axum::Json(serde_json::json!({"message": format!("{integration} is unavailable: integration is not configured")})))
+        (axum::http::StatusCode::SERVICE_UNAVAILABLE, axum::Json(serde_json::json!({"message": format!("{integration} is unavailable. The integration is not configured")})))
     })
 }

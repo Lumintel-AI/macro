@@ -495,25 +495,25 @@ fn is_not_found(error: &ServiceError) -> bool {
 impl CallRtcClient for LivekitRtcClient {
     async fn prepare_room(&self, room_name: &str) -> anyhow::Result<()> {
         let inner = self.inner.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+            anyhow::anyhow!("LiveKit is unavailable. The integration is not configured")
         })?;
         inner.prepare_room(room_name).await
     }
     async fn create_room(&self, room_name: &str) -> anyhow::Result<()> {
         let inner = self.inner.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+            anyhow::anyhow!("LiveKit is unavailable. The integration is not configured")
         })?;
         inner.create_room(room_name).await
     }
     async fn delete_room(&self, room_name: &str) -> anyhow::Result<()> {
         let inner = self.inner.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+            anyhow::anyhow!("LiveKit is unavailable. The integration is not configured")
         })?;
         inner.delete_room(room_name).await
     }
     async fn list_rooms(&self) -> anyhow::Result<Vec<RtcRoom>> {
         let inner = self.inner.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+            anyhow::anyhow!("LiveKit is unavailable. The integration is not configured")
         })?;
         inner.list_rooms().await
     }
@@ -523,7 +523,7 @@ impl CallRtcClient for LivekitRtcClient {
         participant_identity: MacroUserIdStr<'_>,
     ) -> anyhow::Result<String> {
         let inner = self.inner.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+            anyhow::anyhow!("LiveKit is unavailable. The integration is not configured")
         })?;
         inner.generate_token(room_name, participant_identity).await
     }
@@ -534,7 +534,7 @@ impl CallRtcClient for LivekitRtcClient {
         display_name: &str,
     ) -> anyhow::Result<String> {
         let inner = self.inner.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+            anyhow::anyhow!("LiveKit is unavailable. The integration is not configured")
         })?;
         inner
             .generate_guest_token(room_name, guest_id, display_name)
@@ -542,7 +542,7 @@ impl CallRtcClient for LivekitRtcClient {
     }
     async fn remove_guest(&self, room_name: &str, guest_id: GuestId) -> anyhow::Result<()> {
         let inner = self.inner.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+            anyhow::anyhow!("LiveKit is unavailable. The integration is not configured")
         })?;
         inner.remove_guest(room_name, guest_id).await
     }
@@ -561,7 +561,7 @@ impl CallRtcClient for LivekitRtcClient {
         participant_identity: MacroUserIdStr<'_>,
     ) -> anyhow::Result<()> {
         let inner = self.inner.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+            anyhow::anyhow!("LiveKit is unavailable. The integration is not configured")
         })?;
         inner
             .remove_participant(room_name, participant_identity)
@@ -572,7 +572,7 @@ impl CallRtcClient for LivekitRtcClient {
         room_name: &str,
     ) -> anyhow::Result<Option<Vec<crate::domain::meetings::MeetingRtcParticipant>>> {
         let inner = self.inner.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+            anyhow::anyhow!("LiveKit is unavailable. The integration is not configured")
         })?;
         inner.list_meeting_participants(room_name).await
     }
@@ -581,7 +581,7 @@ impl CallRtcClient for LivekitRtcClient {
         room_name: &str,
     ) -> anyhow::Result<Option<Vec<String>>> {
         let inner = self.inner.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+            anyhow::anyhow!("LiveKit is unavailable. The integration is not configured")
         })?;
         inner.list_participant_identities(room_name).await
     }
@@ -591,7 +591,7 @@ impl CallRtcClient for LivekitRtcClient {
         s3_config: &EgressS3Config,
     ) -> anyhow::Result<String> {
         let inner = self.inner.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+            anyhow::anyhow!("LiveKit is unavailable. The integration is not configured")
         })?;
         inner
             .start_room_composite_egress(room_name, s3_config)
@@ -599,26 +599,26 @@ impl CallRtcClient for LivekitRtcClient {
     }
     async fn stop_egress(&self, egress_id: &str) -> anyhow::Result<()> {
         let inner = self.inner.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+            anyhow::anyhow!("LiveKit is unavailable. The integration is not configured")
         })?;
         inner.stop_egress(egress_id).await
     }
     async fn dispatch_transcription_agent(&self, room_name: &str) -> anyhow::Result<()> {
         let inner = self.inner.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+            anyhow::anyhow!("LiveKit is unavailable. The integration is not configured")
         })?;
         inner.dispatch_transcription_agent(room_name).await
     }
     fn verify_access_token(&self, token: &str) -> anyhow::Result<VerifiedRingToken> {
         let inner = self.inner.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+            anyhow::anyhow!("LiveKit is unavailable. The integration is not configured")
         })?;
         inner.verify_access_token(token)
     }
     fn receive_webhook(&self, body: &str, auth_token: &str) -> Result<CallWebhookEvent, CallError> {
         let inner = self.inner.as_ref().ok_or_else(|| {
             CallError::Internal(anyhow::anyhow!(
-                "LiveKit is unavailable: integration is not configured"
+                "LiveKit is unavailable. The integration is not configured"
             ))
         })?;
         inner.receive_webhook(body, auth_token)

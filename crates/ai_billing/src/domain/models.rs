@@ -708,7 +708,7 @@ pub struct UsageSnapshot {
 #[derive(Debug, Error)]
 pub enum BillingError {
     /// The deployment has no payment-provider credentials.
-    #[error("payments are unavailable: Stripe is not configured")]
+    #[error("payments are unavailable. Stripe is not configured")]
     PaymentsUnavailable,
     /// Only the payer may change billing settings or buy credits.
     #[error("only the account that pays for this plan can change its billing")]

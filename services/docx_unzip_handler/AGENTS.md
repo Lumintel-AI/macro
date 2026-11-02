@@ -43,4 +43,4 @@ converts their XML parts into a Bill Of Materials (BOM) stored in MacroDB.
 
 ## Job status delivery
 
-Set `JOB_UPDATE_TRANSPORT=connection_gateway` for gateway callbacks without a Lambda ARN. Configuration loads once in `Config::from_env`; notification code calls the job-update port. Unzip or delivery failures propagate to the VM poller for retry. The default transport remains Lambda.
+Set `JOB_UPDATE_TRANSPORT=connection_gateway` for gateway callbacks without a Lambda ARN. Configuration loads once in `Config::from_env`; notification code calls the job-update port. Delivery failures propagate to the VM poller for retry. A terminal unzip failure that was reported successfully retains the upstream acknowledgement behavior. The default transport remains Lambda.

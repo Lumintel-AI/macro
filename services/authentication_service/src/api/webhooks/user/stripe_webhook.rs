@@ -146,7 +146,7 @@ pub async fn handler(
             .ok_or_else(|| {
                 (
                     StatusCode::SERVICE_UNAVAILABLE,
-                    "Stripe webhooks are unavailable: integration is not configured",
+                    "Stripe webhooks are unavailable. The integration is not configured",
                 )
                     .into_response()
             })?

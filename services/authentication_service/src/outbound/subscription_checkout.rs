@@ -28,7 +28,7 @@ mod test;
 #[derive(Debug, Error)]
 pub enum StripeCheckoutError {
     /// Payment provider credentials or prices are absent.
-    #[error("Stripe is unavailable: integration is not configured")]
+    #[error("Stripe is unavailable. The integration is not configured")]
     Unavailable,
     /// Customer lookup failed.
     #[error(transparent)]

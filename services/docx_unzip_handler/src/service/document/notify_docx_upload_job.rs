@@ -16,7 +16,7 @@ pub async fn handle_docx_unzip_failure(
         tracing::trace!(document_id=?document_id, "docx unzip failed");
         job_updates
             .send(
-                document_id,
+                Some(document_id),
                 &DocxUploadJobResult {
                     job_id: job_id.into(),
                     status: "Failed".into(),

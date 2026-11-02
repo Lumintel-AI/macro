@@ -38,7 +38,7 @@ impl DiscountClient for StripeDiscountClient {
         let stripe_client = self
             .stripe_client
             .as_ref()
-            .context("Stripe is unavailable: integration is not configured")?;
+            .context("Stripe is unavailable. The integration is not configured")?;
         let customer_id: stripe::CustomerId = referrer_customer_id
             .parse()
             .context("invalid stripe customer id format")?;

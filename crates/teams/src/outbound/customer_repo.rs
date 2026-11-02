@@ -218,7 +218,7 @@ impl CustomerRepositoryImpl {
     fn client(&self) -> Result<&stripe::Client, CustomerError> {
         self.client.as_deref().ok_or_else(|| {
             CustomerError::StorageLayerError(anyhow::anyhow!(
-                "Stripe is unavailable: integration is not configured"
+                "Stripe is unavailable. The integration is not configured"
             ))
         })
     }
@@ -226,7 +226,7 @@ impl CustomerRepositoryImpl {
     fn seat_prices(&self) -> Result<&SeatPrices, CustomerError> {
         self.seat_prices.as_ref().ok_or_else(|| {
             CustomerError::StorageLayerError(anyhow::anyhow!(
-                "Stripe prices are unavailable: integration is not configured"
+                "Stripe prices are unavailable. The integration is not configured"
             ))
         })
     }

@@ -65,6 +65,7 @@ pub async fn process_message(
 
     tracing::info!(job_id=%job_id, message_body=?req, "message body");
 
+    let document_key = s3_key::DocumentKey::parse(&req.to_key).ok();
     let result = convert(&job_id, &req, s3_client).await;
 
     if let Err(e) = cleanup_folder(&job_id) {
@@ -77,9 +78,9 @@ pub async fn process_message(
                 tracing::trace!("sending success message to lambda");
                 lambda_client
                     .send(
-                        s3_key::DocumentKey::parse(&req.to_key)?
-                            .document_id()
-                            .context("conversion destination must identify a document")?,
+                        document_key
+                            .as_ref()
+                            .and_then(s3_key::DocumentKey::document_id),
                         &DocxUploadJobResult {
                             job_id: Cow::Borrowed(&job_id),
                             status: "Completed".into(),
@@ -107,9 +108,9 @@ pub async fn process_message(
                 tracing::trace!("sending failure message to lambda");
                 lambda_client
                     .send(
-                        s3_key::DocumentKey::parse(&req.to_key)?
-                            .document_id()
-                            .context("conversion destination must identify a document")?,
+                        document_key
+                            .as_ref()
+                            .and_then(s3_key::DocumentKey::document_id),
                         &DocxUploadJobResult {
                             job_id: Cow::Borrowed(&job_id),
                             status: "Failed".into(),

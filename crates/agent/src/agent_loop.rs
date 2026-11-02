@@ -319,7 +319,7 @@ impl AgentLoop {
         Context: Clone + Send + Sync + 'static,
     {
         // The frontend selects the model by api id; route it to the provider
-        // that serves it (falling back to the default on unknown / unavailable
+        // that serves it (falling back to the default on unknown
         // ids). The router owns provider-specific agent construction.
         self.session_with(
             toolset,
@@ -738,10 +738,12 @@ impl Session {
             (self.bridge_inputs.register_loaded)(called).await;
         }
 
-        let agent = self
-            .agent
-            .as_ref()
-            .map_err(|error| AgentError::Other(anyhow::anyhow!("{error}")))?;
+        let agent = self.agent.as_ref().map_err(|error| match error {
+            AgentError::ProviderUnavailable(provider) => {
+                AgentError::ProviderUnavailable(provider.clone())
+            }
+            error => AgentError::Other(anyhow::anyhow!("{error}")),
+        })?;
         let stream = agent
             .run_stream(
                 prompt.clone(),

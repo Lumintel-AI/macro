@@ -74,3 +74,12 @@ fn stream_id_is_propagated() {
     };
     assert_eq!(stream_id, "stream-1");
 }
+
+#[test]
+fn an_unconfigured_provider_is_reported_as_a_provider_failure() {
+    let error = AgentError::ProviderUnavailable("anthropic".to_owned());
+    assert!(matches!(
+        classify(&error),
+        StreamError::ProviderError { .. }
+    ));
+}

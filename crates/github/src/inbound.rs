@@ -11,7 +11,7 @@ impl axum::response::IntoResponse for crate::domain::models::GithubError {
         use axum::http::StatusCode;
         use std::borrow::Cow;
         let (status_code, message): (StatusCode, Cow<'static, str>) = match self {
-            crate::domain::models::GithubError::Unavailable => (StatusCode::SERVICE_UNAVAILABLE, "GitHub is unavailable: integration is not configured".into()),
+            crate::domain::models::GithubError::Unavailable => (StatusCode::SERVICE_UNAVAILABLE, "GitHub is unavailable. The integration is not configured".into()),
             crate::domain::models::GithubError::Internal(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "internal server error occurred".into(),

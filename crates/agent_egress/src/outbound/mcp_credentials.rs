@@ -133,7 +133,7 @@ where
         // error and the status passes through to the agent.
         let upstream = self.upstream.as_ref().ok_or_else(|| {
             EgressError::Upstream(rootcause::report!(
-                "Pipedream is unavailable: integration is not configured"
+                "Pipedream is unavailable. The integration is not configured"
             ))
         })?;
         let call = upstream.upstream(&record).await.map_err(|error| {

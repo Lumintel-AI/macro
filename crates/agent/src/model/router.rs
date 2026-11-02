@@ -434,8 +434,7 @@ impl ModelRouter {
                     )))
                     .build()
             })
-            .transpose()?
-            .map(Arc::new);
+            .transpose()?;
         // Default base URL is api.openai.com; OpenAI's GPT models use
         // Responses API so reasoning models get max_output_tokens.
         let openai = env
@@ -453,8 +452,7 @@ impl ModelRouter {
                     ))
                     .build()
             })
-            .transpose()?
-            .map(Arc::new);
+            .transpose()?;
         // Cerebras and Fireworks speak the OpenAI Chat Completions API, so they
         // ride the compatible-provider registry: a `<provider>/` segment routes
         // to the client registered under that name. Gemini uses GenerateContent
@@ -474,14 +472,19 @@ impl ModelRouter {
                     ))
                     .build()
             })
-            .transpose()?
-            .map(Arc::new);
-        let mut router = ModelRouter {
-            anthropic,
-            openai,
-            gemini,
-            openai_compatible: HashMap::new(),
+            .transpose()?;
+        let mut router = match (anthropic, openai) {
+            (Some(anthropic), Some(openai)) => ModelRouter::new(anthropic, openai),
+            (anthropic, openai) => ModelRouter {
+                anthropic: anthropic.map(Arc::new),
+                openai: openai.map(Arc::new),
+                gemini: None,
+                openai_compatible: HashMap::new(),
+            },
         };
+        if let Some(gemini) = gemini {
+            router = router.with_gemini_client(gemini);
+        }
         for (key, provider, base_url) in [
             (
                 env.cerebras_api_key.as_ref().and_then(|key| key.value()),

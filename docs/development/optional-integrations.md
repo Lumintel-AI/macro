@@ -24,8 +24,8 @@ GitHub App and LiveKit groups require all their credentials to enable the integr
 
 `JOB_UPDATE_TRANSPORT` accepts `lambda` or `connection_gateway`. It defaults to `lambda`, which requires `WEB_SOCKET_RESPONSE_LAMBDA` and preserves upstream asynchronous invocation.
 
-`connection_gateway` requires the existing `INTERNAL_API_KEY`. Its destination comes from the typed `ConnectionGatewayUrl`, including `OVERRIDE_CONNECTION_GATEWAY_URL`. It sends the original camelCase job result in a `job_update` message to `/message/send/document/{document_id}`. Convert derives the document id from its typed destination S3 key. Unzip already has the document id.
+`connection_gateway` requires the existing `INTERNAL_API_KEY`. Its destination comes from the typed `ConnectionGatewayUrl`, including `OVERRIDE_CONNECTION_GATEWAY_URL`. It sends the original camelCase job result in a `job_update` message to `/message/send/document/{document_id}`. Gateway delivery derives the document id from the typed destination S3 key. Lambda delivery still accepts arbitrary destination keys. Unzip already has the document id.
 
-The gateway client carries fleet authentication, a 15-second timeout and tracing headers. A non-success HTTP status fails delivery. Workers acknowledge successful jobs only after callback delivery succeeds; unzip failures propagate for redrive. Status messages can be repeated after redelivery, so consumers must treat job id and status as repeatable updates.
+The gateway client carries fleet authentication, a 15-second timeout and tracing headers. A non-success HTTP status fails delivery. Workers acknowledge successful jobs only after callback delivery succeeds. Failed callback delivery propagates for redrive. A terminal unzip failure that was reported successfully retains upstream acknowledgement behavior. Status messages can be repeated after redelivery, so consumers must treat job id and status as repeatable updates.
 
 The legacy document-processing WebSocket client is a separate transport. This callback does not recreate that retired WebSocket service or its request-submission protocol.
