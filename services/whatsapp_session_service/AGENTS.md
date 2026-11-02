@@ -119,13 +119,18 @@ current, ingests the traffic of added chats (`external_chat`) through `whatsapp_
 
 ## Config (Doppler `whatsapp-session-service`, `dev` and `prd`)
 
-- `DATABASE_URL` (`${global_databases.<config>.DATABASE_URL}`), the only
-  key. The pool and the dedicated advisory-lock connection both open from it,
+- `DATABASE_URL` (`${global_databases.<config>.DATABASE_URL}`). The pool and
+  the dedicated advisory-lock connection both open from it,
   so it must be the RDS **instance** endpoint (`macro-db-<stack>`), never
   `macrodb-proxy-<stack>`: RDS Proxy multiplexes and reaps idle connections,
   which drops advisory locks and `LISTEN`. Never open a transaction on the
   lock connection: MacroDB kills sessions idle in transaction after 5 minutes.
-- KMS key: `SessionKmsKey` (`src/config.rs`) picks
+- `WHATSAPP_SESSION_KMS_KEY_ID` optionally sets the KMS key ID, key ARN, alias
+  name or alias ARN used for both GenerateDataKey and Decrypt. Load it through
+  `ConfigLoader`, from `APP_SECRETS_JSON` when present, otherwise process env.
+  Leave it unset to keep the existing environment alias. Switching keys
+  requires relinking existing accounts.
+- Default KMS key: `SessionKmsKey` (`src/config.rs`) picks
   `alias/whatsapp-session-service-<environment>` from `ENVIRONMENT`
   (GenerateDataKey + Decrypt); `xtask_local` creates the `-local` alias in
   LocalStack.

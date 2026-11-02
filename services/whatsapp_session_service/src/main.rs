@@ -9,7 +9,7 @@ use macro_entrypoint::{MacroEntrypoint, shutdown_signal};
 use macro_env::Environment;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use tokio_util::sync::CancellationToken;
-use whatsapp_session_service::config::{Config, SessionKmsKey};
+use whatsapp_session_service::config::Config;
 use whatsapp_session_service::inbound::health;
 use whatsapp_session_service::replica::{self, ReplicaDeps, Timings};
 use whatsapp_store_pg::kms::AwsWhatsAppKms;
@@ -51,7 +51,7 @@ async fn run() -> Result<(), rootcause::Report> {
         };
     let kms = AwsWhatsAppKms::new(
         aws_sdk_kms::Client::new(&macro_aws_config::get_macro_aws_config().await),
-        SessionKmsKey::for_environment(environment).to_owned(),
+        config.session_kms_key(environment).to_owned(),
     );
 
     let shutdown = CancellationToken::new();

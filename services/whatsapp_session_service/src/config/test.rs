@@ -38,3 +38,44 @@ fn the_local_alias_is_the_one_localstack_creates() {
         SessionKmsKey::for_environment(Environment::Local)
     )));
 }
+
+#[test]
+fn unset_key_keeps_each_environment_default() {
+    let config: Config = serde_json::from_value(serde_json::json!({
+        "DATABASE_URL": "postgres://localhost/macrodb"
+    }))
+    .unwrap();
+    for (environment, expected) in [
+        (Environment::Local, "alias/whatsapp-session-service-local"),
+        (Environment::Develop, "alias/whatsapp-session-service-dev"),
+        (
+            Environment::Production,
+            "alias/whatsapp-session-service-prod",
+        ),
+    ] {
+        assert_eq!(config.session_kms_key(environment), expected);
+    }
+}
+
+#[test]
+fn configured_key_overrides_every_environment() {
+    for key in [
+        "alias/custom-whatsapp-session",
+        "12345678-1234-1234-1234-123456789012",
+        "arn:aws:kms:us-east-2:123456789012:key/12345678-1234-1234-1234-123456789012",
+        "arn:aws:kms:us-east-2:123456789012:alias/custom-whatsapp-session",
+    ] {
+        let config: Config = serde_json::from_value(serde_json::json!({
+            "DATABASE_URL": "postgres://localhost/macrodb",
+            "WHATSAPP_SESSION_KMS_KEY_ID": key
+        }))
+        .unwrap();
+        for environment in [
+            Environment::Local,
+            Environment::Develop,
+            Environment::Production,
+        ] {
+            assert_eq!(config.session_kms_key(environment), key);
+        }
+    }
+}
