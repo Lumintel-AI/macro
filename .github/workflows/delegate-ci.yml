@@ -126,7 +126,7 @@ jobs:
           sqlx migrate run --source crates/macro_db_client/migrations --database-url "$DATABASE_URL"
           sqlx migrate run --source crates/macro_db_client/migrations --database-url "${DATABASE_URL%/macrodb}/template1"
       - name: Run all features and test targets for the changed package
-        run: cargo test --locked --all-features -p "$PACKAGE"
+        run: cargo test --locked --all-features --no-fail-fast -p "$PACKAGE"
       - name: Record result and remaining disk
         if: always()
         env:
