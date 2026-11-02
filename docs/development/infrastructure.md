@@ -2,7 +2,9 @@
 
 Macro's AWS infrastructure is Pulumi in TypeScript under `infra/`, run with Bun,
 in `us-east-1`; the observability pilot (`infra/stacks/observability`) runs in
-`us-east-2`. Cloudflare Workers deploy with `wrangler`, not Pulumi. This
+`us-east-2`. Rust services take their region from the AWS SDK's default chain
+(`AWS_REGION`, profile, instance metadata) through `macro_aws_config`, falling
+back to `us-east-1`. Cloudflare Workers deploy with `wrangler`, not Pulumi. This
 guide covers how the code is laid out, the patterns to copy, how deploys happen,
 and the traps. To add a whole service, follow the
 [new service guide](../guides/new-service.md).

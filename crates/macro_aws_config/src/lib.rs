@@ -31,16 +31,23 @@ pub async fn sqs_client() -> aws_sdk_sqs::Client {
     aws_sdk_sqs::Client::new(&get_macro_aws_config().await)
 }
 
+/// Region for real AWS when the SDK's default region chain finds none.
+const DEFAULT_AWS_REGION: &str = "us-east-1";
+
 /// Creates a aws_config to use.
 /// If you provide `LOCAL_AWS_URL` environment variable we create a local aws
 /// config with test credentials.
-/// Otherwise we load normally.
+/// Otherwise we load normally. The region comes from the SDK's default chain
+/// (`AWS_REGION`, the active profile, then instance metadata) and falls back to
+/// `us-east-1`.
 pub async fn get_macro_aws_config() -> aws_config::SdkConfig {
     if let Some(local_aws_url) = LocalAwsUrl::new() {
         local_aws_config(local_aws_url.as_ref()).await
     } else {
+        let region = aws_config::meta::region::RegionProviderChain::default_provider()
+            .or_else(DEFAULT_AWS_REGION);
         aws_config::defaults(aws_config::BehaviorVersion::latest())
-            .region("us-east-1")
+            .region(region)
             .load()
             .await
     }
