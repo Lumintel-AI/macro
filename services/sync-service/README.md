@@ -90,6 +90,14 @@ from the client.
   longer changes runtime behavior. `just test-no-alarm` checks the legacy feature
   selection.
 
+## CORS configuration
+
+`FRONTEND_ORIGIN` optionally adds one exact origin, such as
+`https://app.example.com`, to the existing HTTP and WebSocket allowlist.
+Use the scheme, host and optional port without a trailing slash. Unset or
+empty keeps the existing allowlist. Wildcards and the opaque `null` origin
+never grant credentials. Signed session grants remain required.
+
 ## Development
 
 We have 3 environments "test", "dev", and "prod". When developing we typically use "testing". This is deployed with `npx wrangler deploy`, dev with `npx wrangler deploy --env dev`, and prod with `npx wrangler deploy --env prod`.

@@ -34,6 +34,7 @@ async function migrateDatabase(mf: Miniflare) {
 export async function setupMiniflare(
   options: {
     persistPath?: string;
+    frontendOrigin?: string;
     migrate?: boolean;
     dssUrl?: string;
     lexicalServiceUrl?: string;
@@ -69,6 +70,7 @@ export async function setupMiniflare(
     r2Persist: persist('r2'),
     fetchMock: options.fetchMock,
     bindings: {
+      ...(options.frontendOrigin !== undefined ? { FRONTEND_ORIGIN: options.frontendOrigin } : {}),
       ...(options.fetchMock ? { DSS_URL: "https://dss.test", DSS_INTERNAL_AUTH_KEY: "local" } : {}),
       DOCUMENT_PERMISSIONS_SECRET: "local",
       INTERNAL_API_SECRET_KEY: "INTERNAL_API_SECRET",

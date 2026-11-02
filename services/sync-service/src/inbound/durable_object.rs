@@ -1,4 +1,4 @@
-use super::cors::{cors, is_origin_allowed};
+use super::cors::CorsConfig;
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet, HashMap},
@@ -101,6 +101,7 @@ pub type WsMetaMap = BTreeMap<String, WebSocketMetadata>;
 pub struct SyncSession {
     state: State,
     env: Env,
+    cors: CorsConfig,
     /// id of the document, comes from URL path
     document_id: Mutex<Option<Arc<String>>>,
     /// Current document state

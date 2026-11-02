@@ -1,4 +1,24 @@
-use worker::Cors;
+use worker::{Cors, Env};
+
+#[cfg(test)]
+mod test;
+
+/// CORS settings loaded when a Durable Object starts.
+#[derive(Default)]
+pub struct CorsConfig {
+    frontend_origin: Option<String>,
+}
+
+impl From<&Env> for CorsConfig {
+    fn from(env: &Env) -> Self {
+        Self {
+            frontend_origin: env
+                .var("FRONTEND_ORIGIN")
+                .ok()
+                .map(|value| value.to_string()),
+        }
+    }
+}
 
 pub static ALLOWED_ORIGINS: &[&str] = &[
     "http://localhost:5173",
@@ -12,61 +32,72 @@ pub static ALLOWED_ORIGINS: &[&str] = &[
     "https://apollo-testing.macro.com",
 ];
 
-pub fn is_origin_allowed(origin: &str) -> bool {
-    if ALLOWED_ORIGINS.contains(&origin) {
-        return true;
+impl CorsConfig {
+    pub fn is_origin_allowed(&self, origin: &str) -> bool {
+        // Compare the whole origin. Never grant credentials to an opaque origin
+        // or interpret the configured value as a wildcard or hostname suffix.
+        if !origin.is_empty()
+            && origin != "null"
+            && origin != "*"
+            && self.frontend_origin.as_deref() == Some(origin)
+        {
+            return true;
+        }
+        if ALLOWED_ORIGINS.contains(&origin) {
+            return true;
+        }
+        // `localhost` and `*.localhost` (loopback-reserved; local dev uses
+        // per-persona hostnames so each seeded user gets its own cookie jar).
+        if let Some(rest) = origin.strip_prefix("http://")
+            && let Some((host, port)) = rest.rsplit_once(':')
+            && (host == "localhost" || host.ends_with(".localhost"))
+            && let Ok(port) = port.parse::<u16>()
+        {
+            return (3000..=3999).contains(&port) || (20000..=60000).contains(&port);
+        }
+        // Allow feature branch previews: https://{subdomain}.preview.macro.com
+        if let Some(host) = origin.strip_prefix("https://")
+            && let Some(subdomain) = host.strip_suffix(".preview.macro.com")
+        {
+            return !subdomain.is_empty() && !subdomain.contains('/');
+        }
+        false
     }
-    // `localhost` and `*.localhost` (loopback-reserved; local dev uses
-    // per-persona hostnames so each seeded user gets its own cookie jar).
-    if let Some(rest) = origin.strip_prefix("http://")
-        && let Some((host, port)) = rest.rsplit_once(':')
-        && (host == "localhost" || host.ends_with(".localhost"))
-        && let Ok(port) = port.parse::<u16>()
-    {
-        return (3000..=3999).contains(&port) || (20000..=60000).contains(&port);
-    }
-    // Allow feature branch previews: https://{subdomain}.preview.macro.com
-    if let Some(host) = origin.strip_prefix("https://")
-        && let Some(subdomain) = host.strip_suffix(".preview.macro.com")
-    {
-        return !subdomain.is_empty() && !subdomain.contains('/');
-    }
-    false
-}
 
-/// Workaround for this bug: <https://github.com/cloudflare/workers-rs/issues/554>
-pub fn cors(request_origin: Option<&str>) -> Cors {
-    use worker::Method;
-    let cors_origins = request_origin
-        .map(|o| {
-            if is_origin_allowed(o) {
-                vec![o.to_string()]
-            } else {
-                vec![]
-            }
-        })
-        .unwrap_or_default();
+    /// Workaround for this bug: <https://github.com/cloudflare/workers-rs/issues/554>
+    pub fn cors(&self, request_origin: Option<&str>) -> Cors {
+        use worker::Method;
+        let cors_origins = request_origin
+            .map(|o| {
+                if self.is_origin_allowed(o) {
+                    vec![o.to_string()]
+                } else {
+                    vec![]
+                }
+            })
+            .unwrap_or_default();
 
-    Cors::new()
-        .with_credentials(true)
-        // `traceparent`/`tracestate` are injected by the web client's traced
-        // fetch wrapper (see `safeFetch`), so they must be preflight-allowed or
-        // the browser blocks every instrumented call. Kept in sync with
-        // `macro_cors::EXTRA_HEADERS`, which the axum services use; this worker
-        // can't share that list because it's built on tower-http.
-        .with_allowed_headers(vec![
-            "authorization",
-            "content-type",
-            "traceparent",
-            "tracestate",
-        ])
-        .with_methods(vec![
-            Method::Get,
-            Method::Post,
-            Method::Put,
-            Method::Patch,
-            Method::Delete,
-            Method::Options,
-        ])
-        .with_origins(cors_origins)
+        Cors::new()
+            .with_credentials(true)
+            // `traceparent`/`tracestate` are injected by the web client's traced
+            // fetch wrapper (see `safeFetch`), so they must be preflight-allowed or
+            // the browser blocks every instrumented call. Kept in sync with
+            // `macro_cors::EXTRA_HEADERS`, which the axum services use; this worker
+            // can't share that list because it's built on tower-http.
+            .with_allowed_headers(vec![
+                "authorization",
+                "content-type",
+                "traceparent",
+                "tracestate",
+            ])
+            .with_methods(vec![
+                Method::Get,
+                Method::Post,
+                Method::Put,
+                Method::Patch,
+                Method::Delete,
+                Method::Options,
+            ])
+            .with_origins(cors_origins)
+    }
 }

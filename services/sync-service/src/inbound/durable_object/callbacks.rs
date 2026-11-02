@@ -4,6 +4,7 @@ impl SyncSession {
     pub(super) fn new(state: State, env: Env) -> Self {
         Self {
             state,
+            cors: CorsConfig::from(&env),
             env,
             document_id: Mutex::new(None),
             document_state: Mutex::new(None),
@@ -29,7 +30,7 @@ impl SyncSession {
             .get("Origin")
             .context("No `Origin` header found in header")?
         {
-            if is_origin_allowed(&origin) {
+            if self.cors.is_origin_allowed(&origin) {
                 Some(origin)
             } else {
                 return Ok(response(status_codes::FORBIDDEN));
@@ -41,7 +42,7 @@ impl SyncSession {
         if req.method() == Method::Options {
             return Ok(Response::builder()
                 .with_status(status_codes::OK)
-                .with_cors(&cors(set_allow_origin.as_deref()))?
+                .with_cors(&self.cors.cors(set_allow_origin.as_deref()))?
                 .empty());
         }
         let traceparent = worker_rs_otel::traceparent_from_request(&req);
@@ -70,7 +71,7 @@ impl SyncSession {
             .instrument(span),
         )
         .await;
-        res?.with_cors(&cors(set_allow_origin.as_deref()))
+        res?.with_cors(&self.cors.cors(set_allow_origin.as_deref()))
     }
 
     pub(super) async fn websocket_message(

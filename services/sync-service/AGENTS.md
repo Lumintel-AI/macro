@@ -66,6 +66,12 @@ to the requested surface. These are scoped sync JWTs, not app-session tokens.
 - Use Node.js 22.12+/24.x/26+ for Vitest 5; install JS deps with `npm ci`
   (`package-lock.json` is authoritative, not `bun.lock`).
 
+## Config
+
+- `FRONTEND_ORIGIN` optionally adds one exact HTTP/WebSocket origin to the
+  existing CORS allowlist. Unset or empty keeps the upstream defaults. Set it
+  in the selected Wrangler environment; named environments do not inherit vars.
+
 ## Gotchas
 
 - Bumping `loro-crdt` touches three lockfiles: `bun.lock`, the workspace
