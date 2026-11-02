@@ -125,8 +125,14 @@ jobs:
         run: |
           sqlx migrate run --source crates/macro_db_client/migrations --database-url "$DATABASE_URL"
           sqlx migrate run --source crates/macro_db_client/migrations --database-url "${DATABASE_URL%/macrodb}/template1"
-      - name: Run all features and test targets for the changed package
-        run: cargo test --locked --all-features --no-fail-fast -p "$PACKAGE"
+      - name: Run the changed package's test targets
+        run: |
+          # The worker's storage backends are mutually exclusive, as in upstream CI.
+          features=(--all-features)
+          if [ "$PACKAGE" = sync_service ]; then
+            features=()
+          fi
+          cargo test --locked --no-fail-fast "${features[@]}" -p "$PACKAGE"
       - name: Record result and remaining disk
         if: always()
         env:
