@@ -71,17 +71,21 @@ impl Notification for InviteToMacro {
 const MINUTES_PER_WEEK: u64 = 60 * 24 * 7;
 
 fn frontend_host(env: Environment) -> Url {
-    let host = match env {
-        Environment::Production => "https://macro.com".to_string(),
-        Environment::Develop => "https://dev.macro.com".to_string(),
-        Environment::Local => {
-            #[expect(clippy::disallowed_methods, reason = "Only used when running locally")]
-            let port = std::env::var("FRONTEND_PORT").unwrap_or_else(|_| "3000".to_string());
-            format!("http://localhost:{port}")
-        }
+    let app_url = macro_service_urls::AppServiceUrl::new_for_environment(env)
+        .expect("failed to resolve app URL");
+    let host = if matches!(env, Environment::Local)
+        && app_url.as_str() == macro_service_urls::AppServiceUrl::LOCAL
+    {
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "Existing local frontend port setting"
+        )]
+        let port = std::env::var("FRONTEND_PORT").unwrap_or_else(|_| "3000".to_string());
+        format!("http://localhost:{port}")
+    } else {
+        app_url.to_string()
     };
-
-    Url::parse(&host).expect("all the inputs are static, valid values")
+    Url::parse(&host).expect("app URL must be a valid URL")
 }
 
 fn signup_url(env: Environment) -> Url {

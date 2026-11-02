@@ -68,3 +68,8 @@ invites, and the colleague-joined email.
 
 - Docs: `packages/email-renderer/README.md` (if rendering in the standalone
   renderer rather than the email template pipeline here)
+
+## App origin
+
+Invitation links use `AppServiceUrl` and `OVERRIDE_APP_SERVICE_URL`. The local
+`FRONTEND_PORT` default remains when the app URL is not overridden.

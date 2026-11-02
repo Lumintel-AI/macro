@@ -12512,7 +12512,9 @@
       "crates/workspace-hack"
     ],
     "ses_client": [
+      "crates/macro_env",
       "crates/macro_env_var",
+      "crates/macro_service_urls",
       "crates/ses_client",
       "crates/workspace-hack"
     ],

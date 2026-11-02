@@ -10974,6 +10974,7 @@ version = "0.1.0"
 dependencies = [
  "askama",
  "macro_env",
+ "macro_service_urls",
  "macro_user_id",
  "model-entity",
  "notification",
@@ -18202,6 +18203,7 @@ dependencies = [
  "html-escape",
  "lettre",
  "macro_env_var",
+ "macro_service_urls",
  "mockall",
  "tracing",
  "workspace-hack",

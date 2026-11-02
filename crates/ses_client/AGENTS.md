@@ -43,3 +43,6 @@ used by `authentication_service` for invite emails.
 ## Related
 
 - Rules: `.agents/rules/config-and-service-urls.md`
+
+Organization invite login links honor `OVERRIDE_APP_SERVICE_URL`. Without an
+override, existing per-environment links remain unchanged.

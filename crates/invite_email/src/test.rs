@@ -594,3 +594,48 @@ fn team_invites_queued_before_reminders_read_as_first_sends() {
     let parsed: InviteToTeamMetadata = serde_json::from_value(wire).unwrap();
     assert!(!parsed.reminder);
 }
+
+#[test]
+fn configured_origin_reaches_invitation_urls() {
+    let origin = "https://app.example.com:8443";
+    if frontend_host(Environment::Production)
+        .as_str()
+        .trim_end_matches('/')
+        != origin
+    {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "test::configured_origin_reaches_invitation_urls"])
+            .env("OVERRIDE_APP_SERVICE_URL", origin)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+        return;
+    }
+    let referral = get_url(Environment::Production, &ReferralCode("A&B?C".to_owned()));
+    assert_eq!(referral.origin().ascii_serialization(), origin);
+    assert_eq!(
+        referral.query_pairs().collect::<Vec<_>>(),
+        vec![("referral_code".into(), "A&B?C".into())]
+    );
+    let channel = make_channel_invite().signup_url();
+    assert_eq!(channel.as_str(), "https://app.example.com:8443/app/signup");
+    let team = make_team_invite(InviteePlan::Premium).invite_url();
+    assert_eq!(team.origin().ascii_serialization(), origin);
+    assert_eq!(team.path(), "/app/team-invite");
+    let call = CallInvite {
+        title: "A meeting".to_owned(),
+        share_token: "join-token".to_owned(),
+        invited_by: MacroUserIdStr::try_from_email("host@example.com").unwrap(),
+        recipient_email: "guest@example.com".to_owned(),
+    };
+    assert!(
+        call.format_email()
+            .body
+            .contains("https://app.example.com:8443/app/meet/join/join-token")
+    );
+}

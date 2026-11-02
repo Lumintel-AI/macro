@@ -33,3 +33,29 @@ fn preserves_organization_text_and_environment_links() {
         assert!(!result.contains("{PREFIX}"));
     }
 }
+
+#[test]
+fn organization_invite_uses_configured_app_origin() {
+    let origin = "https://app.example.com:8443";
+    let app_url = macro_service_urls::AppServiceUrl::unwrap_new();
+    if app_url.as_str() != origin {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "invite_user::test::organization_invite_uses_configured_app_origin",
+            ])
+            .env("OVERRIDE_APP_SERVICE_URL", origin)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+        return;
+    }
+    let html = build_user_invite_message("Acme", "prod");
+    assert!(html.contains("href=\"https://app.example.com:8443/app/?login=true\""));
+    assert!(!html.contains("{LOGIN_URL}"));
+}
