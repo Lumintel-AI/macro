@@ -1,6 +1,7 @@
-//! The daemon's one input: a TOML file describing the Macro deployment it
+//! A TOML file describing the Macro deployment the daemon
 //! streams from and the harness it runs. See
-//! `config.example.toml` at the crate root.
+//! `config.example.toml` at the crate root. `OVERRIDE_APP_SERVICE_URL` supplies
+//! the web origin when `[macro].web_url` is omitted.
 //!
 //! Pairing (press `p` in the control panel) adds the harness credential to
 //! this file. Treat it as sensitive because that credential is a bearer token.
@@ -231,7 +232,10 @@ pub struct Workspace {
 }
 
 fn default_web_url() -> String {
-    "https://macro.com/app".to_owned()
+    let app_url =
+        macro_service_urls::AppServiceUrl::new_for_environment(macro_env::Environment::Production)
+            .expect("failed to resolve app URL");
+    format!("{}/app", app_url.as_str().trim_end_matches('/'))
 }
 
 /// Why a config failed to load.

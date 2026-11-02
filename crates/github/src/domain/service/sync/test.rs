@@ -1293,6 +1293,7 @@ fn make_sync_service_with_repo_and_notification_ingress(
 
     let service = GithubSyncServiceImpl::new(
         GithubSyncConfig {
+            app_url: url::Url::parse("https://macro.com").unwrap(),
             webhook_secret: "test-webhook-secret".to_string(),
             github_sync_app_url: "https://github.com/apps/test/installations/new?existing=1"
                 .to_string(),
@@ -1326,6 +1327,7 @@ fn make_sync_service_with_repo_and_doc_service(
 
     let service = GithubSyncServiceImpl::new(
         GithubSyncConfig {
+            app_url: url::Url::parse("https://macro.com").unwrap(),
             webhook_secret: "test-webhook-secret".to_string(),
             github_sync_app_url: "https://github.com/apps/test/installations/new?existing=1"
                 .to_string(),
@@ -6219,4 +6221,13 @@ async fn every_installation_delivery_is_published_even_events_sync_ignores() {
     assert_eq!(published[0].event, "workflow_run");
     assert_eq!(published[0].delivery_id.as_deref(), Some("delivery-1"));
     assert_eq!(published[0].installation_id, 12345);
+}
+
+#[test]
+fn task_comment_links_use_the_configured_app_origin() {
+    let origin = url::Url::parse("https://app.example.com:8443").unwrap();
+    assert_eq!(
+        create_macro_task_comment_link("A task", "task-id", &origin),
+        "[A task](https://app.example.com:8443/app/task/task-id)"
+    );
 }

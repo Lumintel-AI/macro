@@ -128,3 +128,9 @@ external chat replies depend on it. Direct session controls still mint IDs.
   update it alongside `src/herdr/` changes.
 - MCP server selection is supplied by `agent_harness` when the session binds;
   native launch forwards that list, with credentials refreshed on launch/resume.
+
+## App origin
+
+When `[macro].web_url` is omitted, `OVERRIDE_APP_SERVICE_URL` selects the app
+origin and the daemon appends `/app`. Without the override, the default remains
+`https://macro.com/app`, regardless of the server environment.

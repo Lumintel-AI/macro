@@ -91,3 +91,8 @@ Reviewed Linear/Jira imports also register read-only tracker connections in ever
 host. `src/import_trackers.rs` creates stable-id tasks via ordinary markdown and
 projects via `InitiativeServiceImpl::create_imported`, with Macro AI attribution;
 project, parent and label writes pass through the owning property services.
+
+## App origin
+
+Hosted booking links use `AppServiceUrl` and `OVERRIDE_APP_SERVICE_URL`. Local
+booking contexts keep their empty public origin.

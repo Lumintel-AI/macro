@@ -557,11 +557,13 @@ pub fn build_booking_link_tool_context(
             )),
         )),
         public_origin: match environment {
-            macro_env::Environment::Production => "https://macro.com",
-            macro_env::Environment::Develop => "https://dev.macro.com",
-            macro_env::Environment::Local => "",
-        }
-        .into(),
+            macro_env::Environment::Production | macro_env::Environment::Develop => {
+                macro_service_urls::AppServiceUrl::new_for_environment(environment)
+                    .expect("failed to resolve app URL")
+                    .to_string()
+            }
+            macro_env::Environment::Local => String::new(),
+        },
     }
 }
 
@@ -579,10 +581,11 @@ pub fn build_booking_management_tool_context(
     calendar_scheduling::inbound::toolset::BookingManagementToolContext {
         service: Arc::new(calendar_scheduling::outbound::administration_client::SchedulingAdministrationClient::new(calendar_url.to_string(), internal_api_key)),
         public_origin: match environment {
-            macro_env::Environment::Production => "https://macro.com",
-            macro_env::Environment::Develop => "https://dev.macro.com",
-            macro_env::Environment::Local => "",
-        }.into(),
+            macro_env::Environment::Production | macro_env::Environment::Develop =>
+                macro_service_urls::AppServiceUrl::new_for_environment(environment)
+                    .expect("failed to resolve app URL").to_string(),
+            macro_env::Environment::Local => String::new(),
+        },
     }
 }
 

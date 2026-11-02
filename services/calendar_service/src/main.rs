@@ -302,8 +302,9 @@ async fn main() -> anyhow::Result<()> {
             calendar_mutation_service.clone(),
             meeting_links.clone(),
             match config.environment {
-                Environment::Production => Some("https://macro.com".into()),
-                Environment::Develop => Some("https://dev.macro.com".into()),
+                Environment::Production | Environment::Develop => {
+                    Some(AppServiceUrl::new()?.to_string())
+                }
                 Environment::Local => None,
             },
         ),

@@ -58,3 +58,8 @@ gateway `/calendar` prefix.
 
 - Rules: `.agents/rules/config-and-service-urls.md` · Skill: `new-service` ·
   Docs: `docs/guides/new-service.md` (uses this service as the model)
+
+## App origin
+
+Hosted booking origins use `AppServiceUrl` and `OVERRIDE_APP_SERVICE_URL`.
+Local scheduling keeps its absent public origin.

@@ -147,3 +147,31 @@ fn updates_are_on_unless_the_config_turns_them_off() {
         toml::from_str(&format!("{EXAMPLE}\n[update]\nauto = false\n")).expect("opt-out parses");
     assert!(!opted_out.update.auto);
 }
+
+#[test]
+fn omitted_web_url_uses_configured_app_origin_for_pairing() {
+    let origin = "https://app.example.com:8443";
+    if default_web_url() != format!("{origin}/app") {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "config::test::omitted_web_url_uses_configured_app_origin_for_pairing",
+            ])
+            .env("OVERRIDE_APP_SERVICE_URL", origin)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+        return;
+    }
+    let input = EXAMPLE.replace(r#"web_url = "http://localhost:3000/app""#, "");
+    let config: Config = toml::from_str(&input).unwrap();
+    assert_eq!(
+        config.macro_api.pairing_approval_url("PAIR-CODE"),
+        "https://app.example.com:8443/app/settings/harness?pair=PAIR-CODE"
+    );
+}

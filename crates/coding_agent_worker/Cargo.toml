@@ -36,6 +36,8 @@ hex = { workspace = true }
 lazy-regex = { workspace = true }
 macro_event_broker = { path = "../macro_event_broker", default-features = false }
 macro_env_var = { path = "../macro_env_var" }
+macro_env = { path = "../macro_env" }
+macro_service_urls = { path = "../macro_service_urls" }
 macro_user_id = { path = "../macro_user_id" }
 macro_uuid = { path = "../macro_uuid" }
 ratatui = { workspace = true }

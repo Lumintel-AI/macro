@@ -133,7 +133,7 @@ use macro_event_broker::{KafkaEventPublisher, MacroEventBrokerService};
 #[cfg(feature = "delete_document_worker")]
 use macro_service_urls::AiEditingWorkerUrl;
 use macro_service_urls::{
-    ConnectionGatewayUrl, LexicalServiceUrl, StaticFileServiceUrl, SyncServiceUrl,
+    AppServiceUrl, ConnectionGatewayUrl, LexicalServiceUrl, StaticFileServiceUrl, SyncServiceUrl,
 };
 use macro_sha_count_client::Redis;
 use notification::domain::service::{
@@ -205,6 +205,7 @@ fn soup_consumer_restart_delay(consecutive_failures: u32) -> Duration {
 
 maybe_env_vars! {
     struct AppleBundleId;
+    struct FrontendPort;
     struct SnsApnsVoipPlatformArn;
 }
 
@@ -629,8 +630,21 @@ pub async fn run() -> anyhow::Result<()> {
         db.clone(),
     )));
 
+    let app_url = AppServiceUrl::new()?;
+    let github_app_origin =
+        if matches!(env, Environment::Local) && app_url.as_str() == AppServiceUrl::LOCAL {
+            let port = FrontendPort::new()
+                .and_then(|port| port.value().map(str::to_owned))
+                .unwrap_or_else(|| "3000".to_owned());
+            format!("http://localhost:{port}")
+        } else {
+            app_url.to_string()
+        };
     let github_sync_service_impl = GithubSyncServiceImpl::new(
         GithubSyncConfig {
+            app_url: github_app_origin
+                .parse()
+                .context("app URL must be a valid URL")?,
             webhook_secret: config.github_webhook_secret_key.as_ref().to_string(),
             github_sync_app_url: config.github_sync_app_url.to_string(),
             sync_app_pem: config.github_sync_app_pem_secret_key.as_ref().to_string(),

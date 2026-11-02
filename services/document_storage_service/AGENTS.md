@@ -101,3 +101,7 @@ threads, pins, recents, notifications, folders, activity.
 - Rules: `.agents/rules/rust/db.md`, `.agents/rules/observability.md`
 
 - Negotiate Mail cache profiles through `x-macro-mail-cache-profile` (CORS-enabled HTTP) and `mailCacheProfile` (WebSocket connection init); preserve authenticated connection data and default unknown capabilities to v2.
+
+GitHub task comment origins are resolved once at startup from `AppServiceUrl`.
+`OVERRIDE_APP_SERVICE_URL` overrides the origin; local defaults retain
+`FRONTEND_PORT`. The domain service receives the parsed URL.

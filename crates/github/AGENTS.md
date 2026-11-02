@@ -81,3 +81,8 @@ link flow, following the hexagonal architecture pattern.
 ## Related
 
 - Rules: `.agents/rules/rust/architecture.md`, `.agents/rules/rust/security.md`
+
+## App origin
+
+Task comment links use `AppServiceUrl` and `OVERRIDE_APP_SERVICE_URL`. The local
+`FRONTEND_PORT` default remains when the app URL is not overridden.
