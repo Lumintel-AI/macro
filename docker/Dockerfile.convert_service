@@ -1,15 +1,20 @@
-FROM rust:latest AS chef 
-ENV SQLX_OFFLINE=true
-# We only pay the installation cost once, 
-# it will be cached from the second build onwards
-# Adding dependencies for bindgen
-RUN apt-get update && apt-get install -y \
-  llvm \
-  libclang-dev \
+# Bookworm glibc is compatible with the Ubuntu Noble runtime.
+FROM rust:1.94-bookworm AS chef
+ENV SQLX_OFFLINE=true CARGO_BUILD_JOBS=2
+# librdkafka uses CMake; convert's bindings also need libclang.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  cmake \
   clang \
+  libclang-dev \
+  pkg-config \
+  libssl-dev \
+  libcurl4-openssl-dev \
+  libglib2.0-dev \
+  liblzma-dev \
+  protobuf-compiler \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
-RUN cargo install cargo-chef cargo-strip 
+RUN cargo install --locked cargo-chef cargo-strip
 WORKDIR /app
 
 FROM chef AS planner
@@ -18,11 +23,13 @@ RUN cargo chef prepare  --recipe-path recipe.json --bin convert_service
 
 FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
+# Cargo patches this crate to a local path during dependency resolution.
+COPY --from=planner /app/vendor /app/vendor
 # Build dependencies - this is the caching Docker layer!
 RUN cargo chef cook --release --recipe-path recipe.json --bin convert_service
 # Build application
 COPY . .
-RUN cargo build --release --bin convert_service && \
+RUN cargo build --locked --release --bin convert_service && \
   cargo strip && \
   mv /app/target/release/convert_service /app/svc
 
@@ -35,11 +42,11 @@ RUN : \
   ca-certificates \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
-RUN curl -L -O https://github.com/CollaboraOnline/online/releases/download/for-code-assets/core-co-25.04-assets.tar.gz
+RUN curl --fail --show-error -L -O https://github.com/CollaboraOnline/online/releases/download/for-code-assets/core-co-25.04-assets.tar.gz
 # This creates a folder include and instdir
 RUN tar -xvf core-co-25.04-assets.tar.gz
 
-FROM ubuntu:noble as base
+FROM ubuntu:noble AS base
 WORKDIR /app
 
 # Accept the Microsoft core fonts license
@@ -65,6 +72,12 @@ RUN fc-cache -f -v
 COPY --chmod=755 --from=builder /app/svc /app/svc
 COPY --from=lok /instdir /app/lok/instdir
 COPY --from=lok /include /app/lok/include
+# Fail the image build if the service cannot load on this runtime or LOK is absent.
+RUN test -s /app/lok/instdir/program/libmergedlo.so \
+  && test -d /app/lok/include \
+  && ldd /app/svc > /tmp/svc-ldd.txt \
+  && cat /tmp/svc-ldd.txt \
+  && ! grep -q 'not found' /tmp/svc-ldd.txt
 ENV PORT=8080
 EXPOSE ${PORT}
 ENTRYPOINT ["dumb-init", "./svc"]
