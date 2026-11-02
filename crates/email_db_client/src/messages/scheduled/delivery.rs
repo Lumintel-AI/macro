@@ -4,6 +4,33 @@ use models_email::service::message::ScheduledMessage;
 use sqlx::types::Uuid;
 use sqlx::{PgConnection, PgPool};
 
+macro_env_var::maybe_env_var! {
+    /// Domain used for outgoing mail identities. Defaults to macro.com.
+    struct SenderBaseAddress;
+}
+
+static MESSAGE_ID_DOMAIN: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+    let configured = SenderBaseAddress::new();
+    resolve_message_id_domain(configured.as_ref().and_then(SenderBaseAddress::value))
+        .expect("SENDER_BASE_ADDRESS must be an email domain")
+});
+
+fn resolve_message_id_domain(base: Option<&str>) -> anyhow::Result<String> {
+    use macro_user_id::email::{Email, ReadEmailParts};
+    let base = base.unwrap_or("macro.com");
+    let address = format!("sender@{base}");
+    let parsed = Email::parse_from_str(&address)?;
+    if parsed.domain_part() != base {
+        anyhow::bail!("SENDER_BASE_ADDRESS must be an email domain");
+    }
+    Ok(format!("send.{base}"))
+}
+
+/// Resolve and validate the stable Message-ID domain once at service startup.
+pub fn message_id_domain() -> &'static str {
+    &MESSAGE_ID_DOMAIN
+}
+
 /// A unique ownership receipt; replacing it fences every older invocation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DeliveryClaimToken(pub Uuid);
@@ -66,9 +93,10 @@ pub async fn claim_delivery(
     let header = schedule.delivery_message_id.or_else(|| {
         (!reconcile).then(|| {
             format!(
-                "{}.{}@send.macro.com",
+                "{}.{}@{}",
                 message_id,
-                macro_uuid::generate_uuid_v7()
+                macro_uuid::generate_uuid_v7(),
+                message_id_domain()
             )
         })
     });

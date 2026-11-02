@@ -329,3 +329,14 @@ async fn pre_upgrade_unfenced_clear_cannot_reopen_failed_delivery(
     assert_eq!(state(&pool).await?, before);
     Ok(())
 }
+
+#[test]
+fn message_id_domain_uses_sender_config_and_rejects_header_injection() {
+    assert_eq!(resolve_message_id_domain(None).unwrap(), "send.macro.com");
+    assert_eq!(
+        resolve_message_id_domain(Some("mail.example.com")).unwrap(),
+        "send.mail.example.com"
+    );
+    assert!(resolve_message_id_domain(Some("bad@example.com")).is_err());
+    assert!(resolve_message_id_domain(Some("example.com\r\nBcc: other@example.com")).is_err());
+}

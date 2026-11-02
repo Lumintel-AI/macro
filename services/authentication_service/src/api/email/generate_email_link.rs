@@ -186,7 +186,7 @@ pub async fn handler(
         .replace("{{VERIFICATION_ID}}", &link_id.to_string());
     ctx.ses_client
         .send_email(
-            "auth@macro.com",
+            &ctx.auth_sender_address,
             &req.email,
             "Verify your email address",
             &content,

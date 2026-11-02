@@ -166,6 +166,7 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> anyhow::Result<Self> {
+        email_db_client::messages::scheduled::delivery::message_id_domain();
         macro_config::ConfigLoader::load::<Config>().context("failed to load config")
     }
 }

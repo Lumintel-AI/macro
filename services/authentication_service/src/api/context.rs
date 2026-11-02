@@ -243,6 +243,8 @@ pub(crate) struct ApiContext {
     pub ai_payment_gateway: Arc<ai_billing::outbound::StripePaymentGateway>,
     /// Whether Gmail link consent requests the Google Calendar scope.
     pub calendar_scope_enabled: bool,
+    #[from_ref(skip)]
+    pub auth_sender_address: String,
     /// Signs and verifies the `state` on account-link OAuth round trips.
     pub account_link_state_key: AccountLinkStateKey,
 }

@@ -112,6 +112,7 @@ pub async fn run() -> anyhow::Result<()> {
     // Parse our configuration from the environment.
     std::sync::LazyLock::force(&crate::api::utils::FRONTEND_CONFIG);
     let config = Config::from_env().context("expected to be able to generate config")?;
+    let auth_sender_address = config.auth_sender_address()?;
     let account_link_state_key = config.account_link_state_key()?;
     let signup_policy = Arc::new(
         config
@@ -733,6 +734,7 @@ pub async fn run() -> anyhow::Result<()> {
             signup_policy,
             rate_limit_service: rate_limit,
             calendar_scope_enabled: config.calendar_scope_enabled,
+            auth_sender_address,
             account_link_state_key,
             jwt_args,
             authorization_state,

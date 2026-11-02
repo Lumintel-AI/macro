@@ -458,3 +458,19 @@ fn cursor_kms_key_required_when_both_absent() {
     let error = resolve_cursor_api_key_kms_key_id(&configured, None).unwrap_err();
     assert!(error.to_string().contains("CURSOR_API_KEY_KMS_KEY_ID"));
 }
+
+#[test]
+fn transactional_sender_uses_configured_domain_and_rejects_invalid_domains() {
+    let mut values = config_values();
+    let config: Config = serde_json::from_value(values.clone()).unwrap();
+    assert_eq!(config.auth_sender_address().unwrap(), "auth@macro.com");
+    values["SENDER_BASE_ADDRESS"] = serde_json::json!("mail.example.com");
+    let config: Config = serde_json::from_value(values.clone()).unwrap();
+    assert_eq!(
+        config.auth_sender_address().unwrap(),
+        "auth@mail.example.com"
+    );
+    values["SENDER_BASE_ADDRESS"] = serde_json::json!("bad@example.com\r\nBcc: other@example.com");
+    let config: Config = serde_json::from_value(values).unwrap();
+    assert!(config.auth_sender_address().is_err());
+}

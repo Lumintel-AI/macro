@@ -130,7 +130,7 @@ pub async fn handler(
     if let Err(e) = ctx
         .ses_client
         .send_email(
-            "auth@macro.com",
+            &ctx.auth_sender_address,
             req.email.trim(),
             DESKTOP_EMAIL_SUBJECT,
             &desktop_email_html(&url),

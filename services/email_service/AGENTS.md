@@ -162,3 +162,9 @@ the gateway `/email` prefix.
 ## Related
 
 - Rules: `.agents/rules/config-and-service-urls.md` · Skill: `new-service`
+
+## Self-hosted email
+
+Startup validates the scheduled delivery Message-ID domain through
+`email_db_client`. `SENDER_BASE_ADDRESS` changes new IDs to `send.<domain>`;
+the default remains `send.macro.com` and retries keep persisted IDs.

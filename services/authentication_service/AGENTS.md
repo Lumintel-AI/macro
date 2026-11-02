@@ -140,3 +140,8 @@ SSO redirect allowlist with an exact scheme, host and port match. Native app
 schemes and localhost routes remain supported. Local cookies stay host-only.
 Without overrides, the existing hosted domains and local `FRONTEND_PORT` remain.
 The service validates the origin at startup.
+
+## Transactional email
+
+`SENDER_BASE_ADDRESS` sets the domain for `auth@<domain>`. It defaults to
+`macro.com` and is validated at startup.

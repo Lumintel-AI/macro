@@ -7319,6 +7319,7 @@ dependencies = [
  "email_utils",
  "futures",
  "macro_db_migrator",
+ "macro_env_var",
  "macro_user_id",
  "macro_uuid",
  "models_email",

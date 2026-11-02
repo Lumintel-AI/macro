@@ -42,6 +42,8 @@ env_vars! {
 maybe_env_vars! {
     /// Browser-reachable FusionAuth origin used for OAuth authorization redirects.
     pub struct FusionAuthPublicUrl;
+    /// Domain used for transactional email senders. Defaults to macro.com.
+    pub struct SenderBaseAddress;
     pub struct MicrosoftClientId;
     pub struct MicrosoftClientSecret;
     pub struct MicrosoftTenantId;
@@ -213,6 +215,8 @@ pub struct Config {
     /// calendar feature isn't using yet.
     #[macro_config_default(false)]
     pub calendar_scope_enabled: bool,
+    /// Domain used by the auth sender.
+    pub sender_base_address: SenderBaseAddress,
 }
 
 /// Complete Microsoft OAuth credentials used to enable Outlook account linking.
@@ -224,6 +228,16 @@ pub(crate) struct MicrosoftCredentials {
 }
 
 impl Config {
+    /// Address used by authentication, merge and onboarding messages.
+    pub fn auth_sender_address(&self) -> anyhow::Result<String> {
+        let domain = self.sender_base_address.value().unwrap_or("macro.com");
+        let address = format!("auth@{domain}");
+        if !email_validator::is_valid_email(&address) {
+            anyhow::bail!("SENDER_BASE_ADDRESS must be an email domain");
+        }
+        Ok(address)
+    }
+
     /// The AI pricing every billing component is composed with. Every value
     /// is validated when the configuration loads.
     pub fn ai_pricing(&self) -> ai_billing::AiPricing {
@@ -246,6 +260,7 @@ impl Config {
             .context("failed to load authentication service config")?;
         config.enable_ai_usage_enforcement = enforcement;
         config.enable_ai_usage_billing = billing;
+        config.auth_sender_address()?;
         Ok(config)
     }
 

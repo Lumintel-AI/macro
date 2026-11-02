@@ -80,3 +80,10 @@ Parsed message responses expose the draft generation captured in the same SQL sn
 ## Related
 
 - Rules: `.agents/rules/rust/db.md` · Docs: `docs/development/database.md`
+
+## Self-hosted email
+
+Scheduled delivery uses `send.<SENDER_BASE_ADDRESS>` for new Message-IDs, with
+`send.macro.com` as the default. Existing persisted IDs survive config changes
+and retries. Call `messages::scheduled::delivery::message_id_domain()` at
+startup to validate the configured domain before accepting deliveries.
