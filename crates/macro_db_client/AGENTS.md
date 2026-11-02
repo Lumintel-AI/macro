@@ -118,3 +118,7 @@ and kind constraints expand without rewriting existing rows and validate separat
 refresh token bindings, pending authorizations, issued codes); their queries and
 expiry sweep belong to `mcp_auth_proxy`. Rows carry `expires_at` and have no
 foreign keys; the broker deletes expired rows.
+
+## Optional billing identity
+
+Apply `optional_stripe_customer` before services that create accounts without Stripe. `user::create_user::create_user` accepts an optional account customer id; account and profile billing fields remain NULL without a provider customer.

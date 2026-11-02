@@ -42,3 +42,7 @@ synchronously via HTTP or asynchronously via SQS.
 ## Related
 
 - Rules: `.agents/rules/config-and-service-urls.md`
+
+## Job status delivery
+
+Set `JOB_UPDATE_TRANSPORT=connection_gateway` to deliver conversion results through the connection gateway. It requires `INTERNAL_API_KEY` and uses `ConnectionGatewayUrl`. The default `lambda` path still requires `WEB_SOCKET_RESPONSE_LAMBDA`. Failed delivery prevents queue acknowledgement.

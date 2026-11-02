@@ -27,6 +27,9 @@ mod test;
 /// Provider and persistence errors retained for logging at the HTTP boundary.
 #[derive(Debug, Error)]
 pub enum StripeCheckoutError {
+    /// Payment provider credentials or prices are absent.
+    #[error("Stripe is unavailable: integration is not configured")]
+    Unavailable,
     /// Customer lookup failed.
     #[error(transparent)]
     Database(#[from] sqlx::Error),
@@ -65,18 +68,43 @@ pub enum StripeCheckoutError {
 /// Concrete capabilities composed at authentication-service startup.
 pub struct StripeCheckoutGateway<I> {
     db: PgPool,
-    stripe: Arc<stripe::Client>,
+    stripe: Option<Arc<stripe::Client>>,
     invites: Arc<I>,
-    prices: SeatPrices,
+    prices: Option<SeatPrices>,
 }
 
 impl<I> StripeCheckoutGateway<I> {
     /// Bind existing customer storage, invite service, prices, and Stripe client.
+    fn stripe(&self) -> Result<&stripe::Client, StripeCheckoutError> {
+        self.stripe
+            .as_deref()
+            .ok_or_else(|| StripeCheckoutError::Unavailable)
+    }
+    fn prices(&self) -> Result<&SeatPrices, StripeCheckoutError> {
+        self.prices
+            .as_ref()
+            .ok_or_else(|| StripeCheckoutError::Unavailable)
+    }
+
     pub fn new(
         db: PgPool,
         stripe: Arc<stripe::Client>,
         invites: Arc<I>,
         prices: SeatPrices,
+    ) -> Self {
+        Self {
+            db,
+            stripe: Some(stripe),
+            invites,
+            prices: Some(prices),
+        }
+    }
+    /// Build billing capabilities with optional provider configuration.
+    pub fn new_optional(
+        db: PgPool,
+        stripe: Option<Arc<stripe::Client>>,
+        invites: Arc<I>,
+        prices: Option<SeatPrices>,
     ) -> Self {
         Self {
             db,
@@ -101,7 +129,7 @@ impl<I> StripeCheckoutGateway<I> {
         params.limit = Some(100);
         let mut sessions = Vec::new();
         loop {
-            let page = stripe::CheckoutSession::list(&self.stripe, &params)
+            let page = stripe::CheckoutSession::list(self.stripe()?, &params)
                 .instrument(tracing::info_span!("stripe.checkout.list"))
                 .await?;
             let next = page.data.last().map(|session| session.id.clone());
@@ -137,7 +165,7 @@ impl<I> StripeCheckoutGateway<I> {
                         // A failure may mean completion raced expiration. Never create
                         // or return another payable link after an ambiguous expiration.
                         let expired =
-                            stripe::CheckoutSession::expire(&self.stripe, &session.id)
+                            stripe::CheckoutSession::expire(self.stripe()?, &session.id)
                             .instrument(tracing::info_span!("stripe.checkout.expire", checkout_session_id = %session.id))
                             .await?;
                         if expired.status != Some(stripe::CheckoutSessionStatus::Expired) {
@@ -157,7 +185,7 @@ impl<I> StripeCheckoutGateway<I> {
                         .as_ref()
                         .ok_or(StripeCheckoutError::UnexpectedResponse)?;
                     let subscription =
-                        stripe::Subscription::retrieve(&self.stripe, &subscription.id(), &[])
+                        stripe::Subscription::retrieve(self.stripe()?, &subscription.id(), &[])
                             .instrument(tracing::info_span!("stripe.subscription.retrieve", subscription_id = %subscription.id()))
                             .await?;
                     if !subscription_terminal(subscription.status) {
@@ -171,7 +199,7 @@ impl<I> StripeCheckoutGateway<I> {
                 None => return Err(StripeCheckoutError::UnexpectedResponse),
             }
         }
-        let history = subscription_history(&self.stripe, customer).await?;
+        let history = subscription_history(self.stripe()?, customer).await?;
         if history.has_existing_subscription {
             return Err(StripeCheckoutError::ExistingSubscription);
         }
@@ -203,7 +231,7 @@ impl<I> StripeCheckoutGateway<I> {
         let mut params = checkout_params(
             customer.clone(),
             &request,
-            self.prices.price_id(request.plan)?,
+            self.prices()?.price_id(request.plan)?,
             terms,
             promotion,
         );
@@ -225,8 +253,7 @@ impl<I> StripeCheckoutGateway<I> {
         };
         tracing::info!(idempotency_key = %key, outcome = "create", "creating checkout offer");
         let stripe = self
-            .stripe
-            .as_ref()
+            .stripe()?
             .clone()
             .with_strategy(stripe::RequestStrategy::Idempotent(key));
         let session = stripe::CheckoutSession::create(&stripe, params)
@@ -243,7 +270,7 @@ impl<I> StripeCheckoutGateway<I> {
             })?;
         // An idempotency replay contains the original response, even if another
         // tab has since expired that session. Never redirect to that stale URL.
-        let session = stripe::CheckoutSession::retrieve(&self.stripe, &session.id, &[])
+        let session = stripe::CheckoutSession::retrieve(self.stripe()?, &session.id, &[])
             .instrument(
                 tracing::info_span!("stripe.checkout.retrieve", checkout_session_id = %session.id),
             )
@@ -273,7 +300,7 @@ impl<I: GtmInviteService> CheckoutGateway for StripeCheckoutGateway<I> {
     }
 
     async fn history(&self, customer: &Self::Customer) -> Result<SubscriptionHistory, Self::Error> {
-        subscription_history(&self.stripe, customer).await
+        subscription_history(self.stripe()?, customer).await
     }
 
     async fn invite_promotion(
@@ -292,7 +319,7 @@ impl<I: GtmInviteService> CheckoutGateway for StripeCheckoutGateway<I> {
         params.code = Some(code);
         params.active = Some(true);
         params.limit = Some(1);
-        Ok(stripe::PromotionCode::list(&self.stripe, &params)
+        Ok(stripe::PromotionCode::list(self.stripe()?, &params)
             .await?
             .data
             .into_iter()

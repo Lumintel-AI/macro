@@ -912,7 +912,7 @@ pub async fn build(
             &document_tool_context,
         ),
         schedule_tool_context: ai_tools::build_routine_tool_context()?,
-        anthropic_tool_context: ai_tools::build_anthropic_tool_context(),
+        anthropic_tool_context: ai_tools::build_anthropic_tool_context()?,
         admission,
         recorder,
         usage_context: ai_usage::UsageContext::system(ai_usage::AiFeature::Chat),

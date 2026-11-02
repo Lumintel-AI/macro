@@ -229,3 +229,17 @@ async fn refuses_a_cleartext_upstream() {
         "{refusal}"
     );
 }
+
+#[tokio::test]
+async fn unconfigured_pipedream_refuses_connected_app_resolution() {
+    let credentials = PipedreamMcpCredentials::<_, SpyUpstream>::new_optional(
+        Arc::new(FixedConnections(Vec::new())),
+        None,
+    );
+    assert!(
+        credentials
+            .resolve(&owner(), BotId::TEST_A, &connected("linear"))
+            .await
+            .is_err()
+    );
+}

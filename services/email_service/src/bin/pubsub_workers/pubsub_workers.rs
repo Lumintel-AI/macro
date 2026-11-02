@@ -391,22 +391,14 @@ async fn main() -> anyhow::Result<()> {
         ))
     };
 
-    let metadata_resolver = if config.use_apollo_crm_enrichment {
-        // No usable key (missing/unreadable secret, or unset locally): fall
-        // back to unfurl rather than running Apollo with an empty key, which
-        // would no-op and pollute the directory with negative-cache rows.
-        if config.apollo_api_key.as_ref().is_empty() {
-            tracing::warn!("apollo api key unavailable; falling back to unfurl CRM enrichment");
-            build_unfurl()?
-        } else {
-            CrmMetadataResolver::Apollo(
-                crm::outbound::apollo_resolver::ApolloCompanyMetadataResolver::new(
-                    config.apollo_api_key.as_ref().to_string(),
-                ),
-            )
-        }
-    } else {
-        build_unfurl()?
+    let metadata_resolver = match (
+        config.use_apollo_crm_enrichment,
+        config.apollo_api_key.as_str(),
+    ) {
+        (true, Some(key)) if !key.trim().is_empty() => CrmMetadataResolver::Apollo(
+            crm::outbound::apollo_resolver::ApolloCompanyMetadataResolver::new(key.to_owned()),
+        ),
+        _ => build_unfurl()?,
     };
 
     let crm_service = crm::domain::service::CrmServiceImpl::new(

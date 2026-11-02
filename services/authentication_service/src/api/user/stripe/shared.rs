@@ -52,6 +52,8 @@ impl StripePrices {
 /// Shared error type for Stripe operations
 #[derive(Debug, Error)]
 pub enum StripeOperationError {
+    #[error("Stripe is unavailable: integration is not configured")]
+    Unavailable,
     #[error("Failed to parse user id")]
     ParseId(#[from] macro_user_id::error::ParseErr),
     #[error("Internal server error")]
@@ -95,6 +97,7 @@ pub enum StripeOperationError {
 impl IntoResponse for StripeOperationError {
     fn into_response(self) -> Response {
         let status = match &self {
+            StripeOperationError::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
             // ParseId and StripeIdParse come from trusted server-side sources (JWT-populated
             // user id, DB-stored Stripe customer id) — a parse failure is a server/auth
             // misconfiguration, not bad client input. Map to 500 so metrics don't blame callers.
@@ -151,6 +154,7 @@ mod test;
 impl From<CheckoutError<StripeCheckoutError>> for StripeOperationError {
     fn from(error: CheckoutError<StripeCheckoutError>) -> Self {
         match error {
+            CheckoutError::Gateway(StripeCheckoutError::Unavailable) => Self::Unavailable,
             CheckoutError::MissingCustomer => Self::MissingStripeId,
             CheckoutError::AlreadySubscribed => Self::AlreadySubscribed,
             CheckoutError::TrialUnavailable => Self::TrialUnavailable,

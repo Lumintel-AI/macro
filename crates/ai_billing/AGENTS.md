@@ -55,3 +55,7 @@ provider cost (plus markup for overage).
 ## Related
 
 - Rules: `.agents/rules/config-and-service-urls.md`
+
+## Optional payment provider
+
+`Option<StripePaymentGateway>` implements the payment port. An absent gateway rejects payments through `NoOpPaymentGateway` and reports no provider subscription period. Compositions can retain usage reads without creating a Stripe client.

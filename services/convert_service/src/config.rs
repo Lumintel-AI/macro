@@ -14,18 +14,9 @@ pub static LOK_PATH: LazyLock<String> = LazyLock::new(|| {
         .to_string()
 });
 
-/// The websocket response lambda
-pub static WEB_SOCKET_RESPONSE_LAMBDA: LazyLock<String> = LazyLock::new(|| {
-    WebSocketResponseLambda::new()
-        .expect("WEB_SOCKET_RESPONSE_LAMBDA must be provided via APP_SECRETS_JSON or env")
-        .as_ref()
-        .to_string()
-});
-
 env_vars! {
     pub struct LokPath;
     pub struct DocumentStorageBucket;
-    pub struct WebSocketResponseLambda;
 }
 
 /// The configuration parameters for the application.
@@ -53,10 +44,6 @@ pub struct Config {
 
     /// The name of the document storage bucket
     pub document_storage_bucket: DocumentStorageBucket,
-
-    /// The lambda function to send job responses to for conversion
-    #[allow(dead_code)]
-    pub web_socket_response_lambda: WebSocketResponseLambda,
 
     /// The port to listen for HTTP requests on.
     #[macro_config_default(8080)]

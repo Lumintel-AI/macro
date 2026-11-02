@@ -105,3 +105,7 @@ threads, pins, recents, notifications, folders, activity.
 GitHub task comment origins are resolved once at startup from `AppServiceUrl`.
 `OVERRIDE_APP_SERVICE_URL` overrides the origin; local defaults retain
 `FRONTEND_PORT`. The domain service receives the parsed URL.
+
+## Optional integrations
+
+OpenAI, Cohere, GitHub App, LiveKit, Cal and Meta configuration may be absent at boot. Disabled HTTP integrations return 503. Duplicate detection is skipped for new tasks without its model providers. Stored documents, call records and GitHub pull request metadata remain readable. See `docs/development/optional-integrations.md`.

@@ -4955,6 +4955,7 @@ dependencies = [
  "reqwest 0.13.4",
  "serde",
  "serde_json",
+ "tokio",
  "tracing",
  "workspace-hack",
 ]
@@ -11409,6 +11410,9 @@ dependencies = [
  "anyhow",
  "aws-sdk-lambda",
  "aws-smithy-types",
+ "connection_gateway_client",
+ "macro_env_var",
+ "macro_service_urls",
  "serde",
  "serde_json",
  "tracing",

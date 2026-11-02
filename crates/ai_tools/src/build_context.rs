@@ -502,7 +502,7 @@ pub async fn build_tool_service_context_from_env(
         user_email_service.clone(),
     );
 
-    let anthropic_tool_context = build_anthropic_tool_context();
+    let anthropic_tool_context = build_anthropic_tool_context()?;
 
     let skill_tool_context = crate::tool_context::build_skill_tool_context(
         search_client.clone(),
@@ -749,8 +749,10 @@ pub async fn build_tool_service_context_from_env(
 ///
 /// Reads `ANTHROPIC_API_KEY` and configures the client with the beta headers
 /// required for web fetch and code execution server tools.
-pub fn build_anthropic_tool_context() -> AnthropicToolContext {
-    let mut config = anthropic::config::Config::dangrously_try_from_env();
+pub fn build_anthropic_tool_context() -> anyhow::Result<AnthropicToolContext> {
+    let Some(mut config) = anthropic::config::Config::try_from_env()? else {
+        return Ok(AnthropicToolContext::unconfigured());
+    };
     config.headers.append(
         anthropic::prelude::WEB_FETCH_TOOL_HEADER.0.clone(),
         anthropic::prelude::WEB_FETCH_TOOL_HEADER.1.clone(),
@@ -760,7 +762,7 @@ pub fn build_anthropic_tool_context() -> AnthropicToolContext {
         anthropic::prelude::CODE_EXECUTION_TOOL_HEADER.1.clone(),
     );
     let client = anthropic::client::Client::with_config(config);
-    AnthropicToolContext::new(client, "claude-haiku-4-5".into())
+    Ok(AnthropicToolContext::new(client, "claude-haiku-4-5".into()))
 }
 
 /// Dummy [`AnthropicToolContext`] that does not require an API key.

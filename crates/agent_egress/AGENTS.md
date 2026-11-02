@@ -70,3 +70,7 @@ never comes from the request. `MacroApiTokenSigner::mint_for_agent` callers
 ## Related
 
 - Rules: `.agents/rules/rust/security.md`, `.agents/rules/rust/architecture.md`
+
+## Optional Pipedream
+
+`PipedreamMcpCredentials::new_optional` accepts an absent upstream and returns an unavailable error for connected-app resolution. Built-in and custom MCP resolvers remain independent.

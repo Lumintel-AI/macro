@@ -27,6 +27,9 @@ pub const NOT_STARTED_STATUS_OPTION_ID: uuid::Uuid =
 /// Errors that can occur during document operations.
 #[derive(Debug, thiserror::Error)]
 pub enum DocumentError {
+    /// An optional capability has no configured provider.
+    #[error("{0}")]
+    Unavailable(String),
     /// The requested document was not found.
     #[error("document not found: {0}")]
     NotFound(String),

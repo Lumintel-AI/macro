@@ -4,7 +4,7 @@ use crate::process::convert;
 pub async fn run_worker(
     worker: sqs_worker::SQSWorker,
     s3_client: s3_client::S3,
-    lambda_client: lambda_client::Lambda,
+    lambda_client: lambda_client::job_update::JobUpdateDelivery,
 ) {
     loop {
         let worker_result = tokio::spawn({

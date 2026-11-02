@@ -41,7 +41,7 @@ pub struct InstallationTokenConfig {
 
 /// Mints repository-scoped installation access tokens.
 pub struct InstallationTokenService<Installations, Client> {
-    config: InstallationTokenConfig,
+    config: Option<InstallationTokenConfig>,
     installations: Installations,
     client: Client,
 }
@@ -54,12 +54,12 @@ where
     /// Build the service over the App's credentials, the installation records
     /// that say who owns which installation, and a GitHub client.
     pub fn new(
-        config: InstallationTokenConfig,
+        config: impl Into<Option<InstallationTokenConfig>>,
         installations: Installations,
         client: Client,
     ) -> Self {
         Self {
-            config,
+            config: config.into(),
             installations,
             client,
         }
@@ -80,7 +80,12 @@ where
         repository: &str,
         permissions: &[(&str, &str)],
     ) -> Result<GithubInstallationAccessToken, GithubError> {
-        let jwt = app_jwt(&self.config.client_id, &self.config.private_key_pem)?;
+        let config = self.config.as_ref().ok_or_else(|| {
+            GithubError::Internal(anyhow::anyhow!(
+                "GitHub App is unavailable: integration is not configured"
+            ))
+        })?;
+        let jwt = app_jwt(&config.client_id, &config.private_key_pem)?;
 
         let installation = self
             .client

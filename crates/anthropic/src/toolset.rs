@@ -27,7 +27,7 @@ use std::sync::Arc;
 /// Service context for Anthropic server tools.
 pub struct AnthropicToolContext {
     /// The Anthropic API client.
-    pub client: Arc<Client>,
+    pub client: Option<Arc<Client>>,
     /// The model to use for server tool invocations.
     pub model: String,
     /// Admission for the authenticated caller before any provider execution.
@@ -51,10 +51,21 @@ impl Clone for AnthropicToolContext {
 }
 
 impl AnthropicToolContext {
+    /// Disable server tools without constructing an authenticated client.
+    pub fn unconfigured() -> Self {
+        Self {
+            client: None,
+            model: "claude-haiku-4-5".into(),
+            admission: Arc::new(ai_billing::domain::admission::DisabledAiAdmissionService),
+            recorder: Arc::new(ai_usage::NoOpUsageRecorder),
+            usage_context: UsageContext::system(ai_usage::AiFeature::Chat),
+        }
+    }
+
     /// Create a new context from a client and model name.
     pub fn new(client: Client, model: String) -> Self {
         Self {
-            client: Arc::new(client),
+            client: Some(Arc::new(client)),
             model,
             admission: Arc::new(ai_billing::domain::admission::DisabledAiAdmissionService),
             recorder: Arc::new(ai_usage::NoOpUsageRecorder),
@@ -119,6 +130,11 @@ pub(crate) async fn invoke_server_tool(
     server_tool: ServerTool,
     input: &str,
 ) -> Result<Vec<ResponseContentKind>, ToolCallError> {
+    let client = context.client.clone().ok_or_else(|| {
+        tool_error(anyhow::anyhow!(
+            "Anthropic server tools are unavailable: ANTHROPIC_API_KEY is not configured"
+        ))
+    })?;
     context
         .admission
         .admit(&request_context.user_id, context.usage_context.feature)
@@ -142,7 +158,6 @@ pub(crate) async fn invoke_server_tool(
         ..Default::default()
     };
 
-    let client = context.client.clone();
     let (tracking, model) = match (
         context.recorder.tracking(),
         ProviderModel::new("anthropic", &context.model),

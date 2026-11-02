@@ -80,9 +80,9 @@ struct Candidate {
 #[derive(Clone)]
 pub struct TaskDedupService<const DIMS: usize, E, V, R> {
     config: TaskDedupConfig,
-    embedder: E,
+    embedder: Option<E>,
     vector_db: V,
-    reranker: R,
+    reranker: Option<R>,
     judge: Arc<dyn TaskDuplicateJudge>,
     notifier: Arc<dyn TaskDedupNotifier>,
     matches: Arc<dyn TaskMatchRepo>,
@@ -119,6 +119,32 @@ where
         )
     }
 
+    /// Compose duplicate detection without requiring model credentials at boot.
+    /// Stored matches remain readable when model providers are unavailable.
+    pub fn new_optional(
+        embedder: Option<E>,
+        vector_db: V,
+        reranker: Option<R>,
+        judge: Arc<dyn TaskDuplicateJudge>,
+        notifier: Arc<dyn TaskDedupNotifier>,
+        matches: Arc<dyn TaskMatchRepo>,
+    ) -> Self {
+        Self {
+            config: TaskDedupConfig::default(),
+            embedder,
+            vector_db,
+            reranker,
+            judge,
+            notifier,
+            matches,
+        }
+    }
+
+    /// Whether new duplicate detection can call both model providers.
+    pub fn is_available(&self) -> bool {
+        self.embedder.is_some() && self.reranker.is_some()
+    }
+
     /// Creates a service with an explicit config.
     ///
     /// Not part of the supported consumer API — production builds the service
@@ -137,9 +163,9 @@ where
     ) -> Self {
         Self {
             config,
-            embedder,
+            embedder: Some(embedder),
             vector_db,
-            reranker,
+            reranker: Some(reranker),
             judge,
             notifier,
             matches,
@@ -228,7 +254,15 @@ where
             title: Cow::Borrowed(title),
             body: Cow::Borrowed(markdown),
         };
-        let labeled = self.embedder.embed(&embeddable).await?;
+        if !self.is_available() {
+            return Err(TaskDedupError::Unavailable);
+        }
+        let labeled = self
+            .embedder
+            .as_ref()
+            .ok_or(TaskDedupError::Unavailable)?
+            .embed(&embeddable)
+            .await?;
         if labeled.is_empty() {
             return Ok(Vec::new());
         }
@@ -289,7 +323,15 @@ where
     /// documents that now have active matches.
     pub async fn detect_new_task(&self, task: NewTask) -> Result<Vec<String>, TaskDedupError> {
         let embeddable = task.as_embeddable();
-        let labeled = self.embedder.embed(&embeddable).await?;
+        if !self.is_available() {
+            return Err(TaskDedupError::Unavailable);
+        }
+        let labeled = self
+            .embedder
+            .as_ref()
+            .ok_or(TaskDedupError::Unavailable)?
+            .embed(&embeddable)
+            .await?;
         if labeled.is_empty() {
             return Ok(Vec::new());
         }
@@ -453,6 +495,8 @@ where
 
         let reranked = self
             .reranker
+            .as_ref()
+            .ok_or(TaskDedupError::Unavailable)?
             .rerank(Content::Borrowed(query), survivors)
             .await
             .map_err(TaskDedupError::Dependency)?;

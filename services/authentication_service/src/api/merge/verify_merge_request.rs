@@ -191,7 +191,8 @@ pub async fn handler(
     if let Some(stripe_customer_id) = stripe_customer {
         tracing::trace!(stripe_customer_id, "delete_stripe_customer");
         if let Ok(customer_id) = stripe_customer_id.parse()
-            && let Err(e) = stripe::Customer::delete(&ctx.stripe_client, &customer_id).await
+            && let Some(stripe_client) = ctx.stripe_client.as_ref()
+            && let Err(e) = stripe::Customer::delete(stripe_client, &customer_id).await
         {
             tracing::error!(error=?e, "unable to delete stripe customer");
         }

@@ -1042,3 +1042,21 @@ async fn active_duplicates_returns_the_other_side() {
     assert_eq!(duplicates.len(), 1);
     assert_eq!(duplicates[0].task_id, "O");
 }
+
+#[tokio::test]
+async fn missing_reranker_refuses_detection_before_embedding_or_persistence() {
+    let vector_db = MockVectorDb::default();
+    let service: MockService = TaskDedupService::new_optional(
+        Some(MockEmbedder),
+        vector_db.clone(),
+        None,
+        Arc::new(MockJudge::default()),
+        Arc::new(MockNotifier::default()),
+        Arc::new(MockMatchRepo::default()),
+    );
+    assert!(matches!(
+        service.detect_new_task(new_task("task-one")).await,
+        Err(TaskDedupError::Unavailable)
+    ));
+    assert!(vector_db.inner.upserted.lock().unwrap().is_empty());
+}

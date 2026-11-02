@@ -141,7 +141,16 @@ pub async fn handler(
     let event = stripe_webhook::Webhook::construct_event(
         payload,
         signature,
-        ctx.stripe_webhook_secret.as_ref(),
+        ctx.stripe_webhook_secret
+            .as_ref()
+            .ok_or_else(|| {
+                (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "Stripe webhooks are unavailable: integration is not configured",
+                )
+                    .into_response()
+            })?
+            .as_ref(),
     )
     .map_err(|e| {
         tracing::error!(error=?e, "failed to construct stripe event");
@@ -282,10 +291,10 @@ async fn handle_payment_event(
         .parse()
         .context("expected subscription id")?;
     let subscription =
-        stripe::Subscription::retrieve(&ctx.stripe_client, &subscription_id, &[]).await?;
+        stripe::Subscription::retrieve(ctx.stripe_client()?, &subscription_id, &[]).await?;
 
     let customer_id = subscription.customer.id();
-    let customer = stripe::Customer::retrieve(&ctx.stripe_client, &customer_id, &[]).await?;
+    let customer = stripe::Customer::retrieve(ctx.stripe_client()?, &customer_id, &[]).await?;
 
     tracing::trace!(customer=?customer, "retrieved customer");
 
@@ -342,7 +351,11 @@ async fn handle_payment_event(
         .data
         .iter()
         .filter_map(|item| item.price.as_ref())
-        .find_map(|price| ctx.stripe_prices.plan_for_price(price.id.as_str()));
+        .find_map(|price| {
+            ctx.stripe_prices
+                .as_ref()
+                .and_then(|prices| prices.plan_for_price(price.id.as_str()))
+        });
     // This subscription was fetched with the `stripe` client, which pins its
     // own (older) API version where the current period still lives on the
     // subscription. Webhook payloads arrive on the endpoint's newer version,
@@ -396,7 +409,7 @@ async fn handle_payment_event(
         list_subscriptions.limit = Some(10);
 
         let all_subscriptions =
-            stripe::Subscription::list(&ctx.stripe_client, &list_subscriptions).await?;
+            stripe::Subscription::list(ctx.stripe_client()?, &list_subscriptions).await?;
 
         let has_other_active_personal_subscription =
             all_subscriptions.data.iter().any(|subscription| {
@@ -499,7 +512,7 @@ async fn handle_customer_subscription_event(
         .parse()
         .context("expected customer id")?;
 
-    let customer = stripe::Customer::retrieve(&ctx.stripe_client, &customer_id, &[]).await?;
+    let customer = stripe::Customer::retrieve(ctx.stripe_client()?, &customer_id, &[]).await?;
 
     tracing::trace!(customer=?customer, "retrieved customer");
 
@@ -565,11 +578,11 @@ async fn handle_customer_subscription_event(
     // team subscription may carry one item per plan; its members' plans are
     // recorded on the team). The first item carries the current period on
     // this API version.
-    let plan = subscription
-        .items
-        .data
-        .iter()
-        .find_map(|item| ctx.stripe_prices.plan_for_price(item.price.id.as_str()));
+    let plan = subscription.items.data.iter().find_map(|item| {
+        ctx.stripe_prices
+            .as_ref()
+            .and_then(|prices| prices.plan_for_price(item.price.id.as_str()))
+    });
     let period = subscription.items.data.first().and_then(|item| {
         period_from_timestamps(item.current_period_start, item.current_period_end)
     });
@@ -616,7 +629,7 @@ async fn handle_customer_subscription_event(
     list_subscriptions.limit = Some(10);
 
     let all_subscriptions =
-        stripe::Subscription::list(&ctx.stripe_client, &list_subscriptions).await?;
+        stripe::Subscription::list(ctx.stripe_client()?, &list_subscriptions).await?;
 
     let active_subscriptions: Vec<_> = all_subscriptions
         .data
@@ -645,7 +658,7 @@ async fn handle_customer_subscription_event(
 
             let sub_id: stripe::SubscriptionId = subscription_id.parse()?;
             stripe::Subscription::cancel(
-                &ctx.stripe_client,
+                ctx.stripe_client()?,
                 &sub_id,
                 stripe::CancelSubscription::default(),
             )
@@ -678,7 +691,7 @@ async fn handle_customer_subscription_event(
         metadata.insert("has_trialed".to_string(), "true".to_string());
         params.metadata = Some(metadata);
 
-        stripe::Customer::update(&ctx.stripe_client, &customer_id, params).await?;
+        stripe::Customer::update(ctx.stripe_client()?, &customer_id, params).await?;
 
         tracing::info!(
             customer_id=%customer_id,
@@ -708,7 +721,7 @@ async fn handle_customer_subscription_event(
         .await?;
     sync_personal_billing_period(ctx, &email, period, verified).await?;
     if let Some(change) =
-        billing::personal_plan_change(billing_event, &ctx.stripe_prices, is_new_subscription)
+        billing::personal_plan_change(billing_event, ctx.stripe_prices()?, is_new_subscription)
     {
         let user = MacroUserIdStr::try_from_email(email.as_ref())?;
         ctx.ai_billing_service

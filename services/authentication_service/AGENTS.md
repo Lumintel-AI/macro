@@ -150,3 +150,7 @@ The service validates the origin at startup.
 
 Set `SUPPORT_CHANNELS_ENABLED=false` to skip upstream staff support channels
 while retaining starter documents. Support channels remain enabled by default.
+
+## Optional billing and GitHub
+
+Stripe and GitHub OAuth credentials are optional. Signups without Stripe save NULL billing customer ids after the `optional_stripe_customer` migration. Checkout and plan-change entry points return HTTP 503 without Stripe credentials or prices. See `docs/development/optional-integrations.md`.

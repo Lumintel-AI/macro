@@ -40,3 +40,7 @@ converts their XML parts into a Bill Of Materials (BOM) stored in MacroDB.
 ## VM execution
 
 `docx_unzip_handler_vm` in `src/vm.rs` shares the Lambda handler. Set `VM_QUEUE_URL` to its dedicated SQS queue. The shared poller owns visibility renewal, acknowledgement and shutdown. Failures remain on the queue for redrive.
+
+## Job status delivery
+
+Set `JOB_UPDATE_TRANSPORT=connection_gateway` for gateway callbacks without a Lambda ARN. Configuration loads once in `Config::from_env`; notification code calls the job-update port. Unzip or delivery failures propagate to the VM poller for retry. The default transport remains Lambda.

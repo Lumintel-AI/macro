@@ -54,7 +54,7 @@ fn unroutable_ids_fall_back_to_the_smart_model() {
     for id in unroutable {
         assert!(router.route(id).is_err(), "`{id}` should not route");
 
-        let RoutedModel::Anthropic(fallback) = router.route_or_default(id) else {
+        let RoutedModel::Anthropic(fallback) = router.route_or_default(id).unwrap() else {
             panic!("`{id}` fallback should be native Anthropic");
         };
         let wire_id = fallback.completion().model;

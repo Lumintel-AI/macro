@@ -23,7 +23,7 @@ use std::time::{Duration, Instant};
 use ai_toolset::RequestContext;
 use ai_usage::{UsageContext, UsageRecorder};
 use futures::StreamExt;
-use macro_env_var::env_var;
+use macro_env_var::maybe_env_var;
 use rig_agent::agent::{Agent, AgentBuilder, MultiTurnStreamItem};
 use rig_agent::streaming::StreamingPrompt;
 use rig_agent::tool::server::ToolServerHandle;
@@ -49,7 +49,7 @@ use crate::hook::{BridgeInputs, StreamBridge};
 use crate::stream::{ChatCompletionStream, StreamPart};
 use crate::telemetry::{ChatSpanHook, GenAiContext, TracedModel};
 
-env_var! {
+maybe_env_var! {
     struct ApiKeys {
         AnthropicApiKey,
         OpenaiApiKey,
@@ -383,8 +383,8 @@ pub(crate) struct AnthropicAgent<H: HttpClientExt + Clone + Default + std::fmt::
 /// compatible providers with `with_openai_provider` on the metered router.
 #[derive(Clone)]
 pub struct ModelRouter<H = ReqwestClient> {
-    anthropic: Arc<anthropic::Client<AnthropicPromptLayout<H>>>,
-    openai: Arc<openai::Client<H>>,
+    anthropic: Option<Arc<anthropic::Client<AnthropicPromptLayout<H>>>>,
+    openai: Option<Arc<openai::Client<H>>>,
     gemini: Option<Arc<gemini::Client<H>>>,
     openai_compatible: HashMap<String, Arc<openai::CompletionsClient<H>>>,
 }
@@ -398,8 +398,8 @@ impl<H: HttpClientExt + Clone + 'static> ModelRouter<H> {
         openai: openai::Client<H>,
     ) -> Self {
         Self {
-            anthropic: Arc::new(anthropic),
-            openai: Arc::new(openai),
+            anthropic: Some(Arc::new(anthropic)),
+            openai: Some(Arc::new(openai)),
             gemini: None,
             openai_compatible: HashMap::new(),
         }
@@ -409,55 +409,96 @@ impl<H: HttpClientExt + Clone + 'static> ModelRouter<H> {
 impl ModelRouter {
     /// Build a router with the built-in providers from the environment.
     ///
-    /// Requires `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `CEREBRAS_API_KEY`,
-    /// `FIREWORK_API_KEY`, and `GOOGLE_GENERATIVE_AI_API_KEY`. Chain
-    /// `with_openai_provider` on the returned router to add more.
+    /// Registers only providers with configured keys. A missing provider returns
+    /// an unavailable error when selected. External runtimes need no model keys.
     pub fn try_from_env() -> Result<ModelRouter<MeteredHttpClient>, AgentError> {
-        let env = ApiKeys::new()?;
+        let env = ApiKeys::new();
         // No executions may hide below the financial HTTP boundary.
         let http = ReqwestClient::builder()
             .retry(reqwest::retry::never())
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|error| rig_core::http_client::Error::Instance(Box::new(error)))?;
-        let anthropic = anthropic::Client::builder()
-            .api_key(env.anthropic_api_key.to_string())
-            .http_client(AnthropicPromptLayout::new(MeteredHttpClient::new(
-                http.clone(),
-                ANTHROPIC_PROVIDER,
-                WireProtocol::Anthropic,
-            )))
-            .build()?;
+        let anthropic = env
+            .anthropic_api_key
+            .as_ref()
+            .and_then(|key| key.value())
+            .filter(|key| !key.trim().is_empty())
+            .map(|key| {
+                anthropic::Client::builder()
+                    .api_key(key.to_owned())
+                    .http_client(AnthropicPromptLayout::new(MeteredHttpClient::new(
+                        http.clone(),
+                        ANTHROPIC_PROVIDER,
+                        WireProtocol::Anthropic,
+                    )))
+                    .build()
+            })
+            .transpose()?
+            .map(Arc::new);
         // Default base URL is api.openai.com; OpenAI's GPT models use
         // Responses API so reasoning models get max_output_tokens.
-        let openai = openai::Client::builder()
-            .api_key(env.openai_api_key.to_string())
-            .http_client(MeteredHttpClient::new(
-                http.clone(),
-                OPENAI_PROVIDER,
-                WireProtocol::Responses,
-            ))
-            .build()?;
+        let openai = env
+            .openai_api_key
+            .as_ref()
+            .and_then(|key| key.value())
+            .filter(|key| !key.trim().is_empty())
+            .map(|key| {
+                openai::Client::builder()
+                    .api_key(key.to_owned())
+                    .http_client(MeteredHttpClient::new(
+                        http.clone(),
+                        OPENAI_PROVIDER,
+                        WireProtocol::Responses,
+                    ))
+                    .build()
+            })
+            .transpose()?
+            .map(Arc::new);
         // Cerebras and Fireworks speak the OpenAI Chat Completions API, so they
         // ride the compatible-provider registry: a `<provider>/` segment routes
         // to the client registered under that name. Gemini uses GenerateContent
         // so tool-call thought signatures survive the multi-step tool loop.
-        let gemini = gemini::Client::builder()
-            .api_key(env.google_generative_ai_api_key.to_string())
-            .http_client(MeteredHttpClient::new(
-                http.clone(),
-                GOOGLE_PROVIDER,
-                WireProtocol::Gemini,
-            ))
-            .build()?;
-        ModelRouter::new(anthropic, openai)
-            .with_gemini_client(gemini)
-            .with_openai_provider(CEREBRAS_PROVIDER, CEREBRAS_BASE_URL, &env.cerebras_api_key)?
-            .with_openai_provider(
+        let gemini = env
+            .google_generative_ai_api_key
+            .as_ref()
+            .and_then(|key| key.value())
+            .filter(|key| !key.trim().is_empty())
+            .map(|key| {
+                gemini::Client::builder()
+                    .api_key(key.to_owned())
+                    .http_client(MeteredHttpClient::new(
+                        http.clone(),
+                        GOOGLE_PROVIDER,
+                        WireProtocol::Gemini,
+                    ))
+                    .build()
+            })
+            .transpose()?
+            .map(Arc::new);
+        let mut router = ModelRouter {
+            anthropic,
+            openai,
+            gemini,
+            openai_compatible: HashMap::new(),
+        };
+        for (key, provider, base_url) in [
+            (
+                env.cerebras_api_key.as_ref().and_then(|key| key.value()),
+                CEREBRAS_PROVIDER,
+                CEREBRAS_BASE_URL,
+            ),
+            (
+                env.firework_api_key.as_ref().and_then(|key| key.value()),
                 FIREWORKS_PROVIDER,
                 FIREWORKS_BASE_URL,
-                &env.firework_api_key,
-            )
+            ),
+        ] {
+            if let Some(key) = key.filter(|key| !key.trim().is_empty()) {
+                router = router.with_openai_provider(provider, base_url, key)?;
+            }
+        }
+        Ok(router)
     }
 
     /// The process-wide full router, built from the environment on first use.
@@ -513,7 +554,7 @@ impl ModelRouter<MeteredHttpClient> {
         let mut router = self.clone();
         match provider {
             ANTHROPIC_PROVIDER => {
-                router.anthropic = Arc::new(
+                router.anthropic = Some(Arc::new(
                     anthropic::Client::builder()
                         .api_key(api_key)
                         .http_client(AnthropicPromptLayout::new(MeteredHttpClient::new(
@@ -522,10 +563,10 @@ impl ModelRouter<MeteredHttpClient> {
                             WireProtocol::Anthropic,
                         )))
                         .build()?,
-                );
+                ));
             }
             OPENAI_PROVIDER => {
-                router.openai = Arc::new(
+                router.openai = Some(Arc::new(
                     openai::Client::builder()
                         .api_key(api_key)
                         .http_client(MeteredHttpClient::new(
@@ -534,7 +575,7 @@ impl ModelRouter<MeteredHttpClient> {
                             WireProtocol::Responses,
                         ))
                         .build()?,
-                );
+                ));
             }
             other => return Err(AgentError::UnknownModel(other.to_owned())),
         }
@@ -585,18 +626,22 @@ impl<H: HttpClientExt + Clone + Default + std::fmt::Debug + 'static> ModelRouter
         if parsed.provider() == ANTHROPIC_PROVIDER {
             return Ok(RoutedModel::Anthropic(AnthropicModel::new(
                 parsed,
-                self.anthropic.clone(),
+                self.anthropic.clone().ok_or_else(|| {
+                    AgentError::ProviderUnavailable(ANTHROPIC_PROVIDER.to_owned())
+                })?,
             )));
         }
         if parsed.provider() == OPENAI_PROVIDER {
             return Ok(RoutedModel::OpenAiResponses(OpenAiResponsesModel::new(
                 parsed,
-                self.openai.clone(),
+                self.openai
+                    .clone()
+                    .ok_or_else(|| AgentError::ProviderUnavailable(OPENAI_PROVIDER.to_owned()))?,
             )));
         }
         if parsed.provider() == GOOGLE_PROVIDER {
             let Some(client) = &self.gemini else {
-                return Err(AgentError::UnknownModel(model.to_string()));
+                return Err(AgentError::ProviderUnavailable(GOOGLE_PROVIDER.to_owned()));
             };
             return Ok(RoutedModel::Gemini(GeminiModel::new(
                 parsed,
@@ -609,12 +654,25 @@ impl<H: HttpClientExt + Clone + Default + std::fmt::Debug + 'static> ModelRouter
                 OpenAiChatCompletionsModel::new(parsed, client),
             ));
         }
+        if matches!(parsed.provider(), CEREBRAS_PROVIDER | FIREWORKS_PROVIDER) {
+            return Err(AgentError::ProviderUnavailable(
+                parsed.provider().to_owned(),
+            ));
+        }
         Err(AgentError::UnknownModel(model.to_string()))
     }
 
     /// Route `model`, falling back to the default model on an unroutable id.
-    pub(crate) fn route_or_default<'a>(&self, model: &'a str) -> RoutedModel<'a, H> {
-        self.route(model).unwrap_or_else(|_| self.default_model())
+    pub(crate) fn route_or_default<'a>(
+        &self,
+        model: &'a str,
+    ) -> Result<RoutedModel<'a, H>, AgentError> {
+        match self.route(model) {
+            Err(AgentError::UnknownModel(_) | AgentError::MalformedModel(_)) => {
+                self.default_model()
+            }
+            result => result,
+        }
     }
 
     /// The fallback model: native Anthropic serving [`PredefinedModel::Smart`].
@@ -622,11 +680,13 @@ impl<H: HttpClientExt + Clone + Default + std::fmt::Debug + 'static> ModelRouter
     /// Built via `From<PredefinedModel>` so the bound [`Model`] carries the
     /// bare api id — `PredefinedModel`'s `Display` is the provider-qualified
     /// routing id, which the Anthropic API rejects as a model name.
-    fn default_model(&self) -> RoutedModel<'static, H> {
-        RoutedModel::Anthropic(AnthropicModel::new(
+    fn default_model(&self) -> Result<RoutedModel<'static, H>, AgentError> {
+        Ok(RoutedModel::Anthropic(AnthropicModel::new(
             PredefinedModel::Smart.into(),
-            self.anthropic.clone(),
-        ))
+            self.anthropic
+                .clone()
+                .ok_or_else(|| AgentError::ProviderUnavailable(ANTHROPIC_PROVIDER.to_owned()))?,
+        )))
     }
 }
 
@@ -1054,3 +1114,6 @@ impl ProviderAgent {
         )))
     }
 }
+
+#[cfg(test)]
+mod test;

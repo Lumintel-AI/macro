@@ -1,3 +1,6 @@
+/// Configurable document-job status delivery.
+pub mod job_update;
+
 mod invoke;
 
 #[derive(Clone, Debug)]

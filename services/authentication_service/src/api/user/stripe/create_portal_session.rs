@@ -47,7 +47,13 @@ pub async fn create_portal_session(
     let mut params = stripe::CreateBillingPortalSession::new(customer_id);
     params.return_url = Some(req.return_url.as_str());
 
-    let session = stripe::BillingPortalSession::create(&ctx.stripe_client, params).await?;
+    let session = stripe::BillingPortalSession::create(
+        ctx.stripe_client
+            .as_deref()
+            .ok_or(super::StripeOperationError::Unavailable)?,
+        params,
+    )
+    .await?;
 
     // Validate but return the exact URL Stripe gave us — session URLs are signed/opaque
     // and `Url::parse(...).to_string()` can normalize in ways that break the signature.

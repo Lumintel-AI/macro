@@ -86,3 +86,7 @@ link flow, following the hexagonal architecture pattern.
 
 Task comment links use `AppServiceUrl` and `OVERRIDE_APP_SERVICE_URL`. The local
 `FRONTEND_PORT` default remains when the app URL is not overridden.
+
+## Optional GitHub credentials
+
+Installation-token and account-link services accept optional credential configuration. Operations requiring an absent configuration return an unavailable error before provider authentication. Configured constructors preserve existing behavior.

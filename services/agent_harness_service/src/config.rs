@@ -11,7 +11,7 @@ use entity_registry::NonUserOwners;
 pub use macro_env::Environment;
 use macro_uuid::Uuid;
 
-use secretsmanager_client::LocalOrRemoteSecret;
+use secretsmanager_client::{LocalOrRemoteSecret, OptionalLocalOrRemoteSecret};
 
 macro_env_var::env_vars!(
     /// Local static file bucket, read only when using local AWS.
@@ -149,11 +149,10 @@ pub struct Config {
     /// Base URL of the Daytona REST API.
     #[macro_config_default(String::from("https://app.daytona.io/api"))]
     pub daytona_api_url: String,
-    /// API key the Daytona client authenticates with. Empty means the
+    /// API key the Daytona client authenticates with. Absent means the
     /// managed (sandbox-provisioning) path is unarmed: external sessions
     /// still work, and a managed spawn fails loudly at spawn time.
-    #[macro_config_default(String::new())]
-    pub daytona_api_key: String,
+    pub daytona_api_key: Option<String>,
     /// Name of the prebuilt Daytona snapshot to create sandboxes from. The
     /// image is expected to be built and pushed as a snapshot out of band,
     /// keeping image builds off the first-prompt critical path.
@@ -162,10 +161,9 @@ pub struct Config {
     /// API key sandboxes run Anthropic models with. Injected into the
     /// sandbox environment at creation, where it activates opencode's
     /// `anthropic` provider — the only provider
-    /// `crates/agent_harness/container/opencode.json` enables. Empty means
+    /// `crates/agent_harness/container/opencode.json` enables. Absent means
     /// sandboxes advertise no models and managed sessions cannot prompt.
-    #[macro_config_default(String::new())]
-    pub anthropic_api_key: String,
+    pub anthropic_api_key: Option<String>,
     /// Run sandboxes on the local Docker daemon instead of Daytona.
     ///
     /// Default off: a deployed harness must keep using Daytona even if this
@@ -231,11 +229,11 @@ pub struct Config {
     /// Optional host-reachable egress origin for external runtimes in local stacks.
     pub external_egress_base_url: Option<String>,
     /// OAuth client ID for the Pipedream API.
-    pub pipedream_client_id: PipedreamClientId,
+    pub pipedream_client_id: Option<PipedreamClientId>,
     /// OAuth client secret for the Pipedream API.
-    pub pipedream_client_secret: PipedreamClientSecret,
+    pub pipedream_client_secret: Option<PipedreamClientSecret>,
     /// The Pipedream Connect project ID.
-    pub pipedream_project_id: PipedreamProjectId,
+    pub pipedream_project_id: Option<PipedreamProjectId>,
     /// The Pipedream project environment (`development` or `production`).
     #[macro_config_default(default_pipedream_environment())]
     pub pipedream_environment: String,
@@ -261,14 +259,29 @@ pub struct Config {
     /// viewer stored for the same base and head.
     pub github_pull_request_patch_bucket: String,
     /// Client id of the GitHub App installation tokens are minted for.
-    pub github_sync_app_client_id: String,
+    pub github_sync_app_client_id: Option<String>,
     /// PEM private key of that App.
-    pub github_sync_app_pem_secret_key: LocalOrRemoteSecret<GithubSyncAppPemSecretKey>,
+    pub github_sync_app_pem_secret_key: OptionalLocalOrRemoteSecret<GithubSyncAppPemSecretKey>,
     /// Lets a team-scoped bot with no acting user own the sessions it creates.
     pub enable_non_user_owners: EnableNonUserOwners,
 }
 
 impl Config {
+    /// GitHub App credentials, absent when installation-token operations are disabled.
+    pub fn github_installation_config(
+        &self,
+    ) -> Option<github::domain::service::InstallationTokenConfig> {
+        Some(github::domain::service::InstallationTokenConfig {
+            client_id: self.github_sync_app_client_id.clone()?,
+            private_key_pem: self
+                .github_sync_app_pem_secret_key
+                .0
+                .as_ref()?
+                .as_ref()
+                .to_owned(),
+        })
+    }
+
     /// The AI pricing every billing component is composed with. Every value
     /// is validated when the configuration loads.
     pub fn ai_pricing(&self) -> ai_billing::AiPricing {

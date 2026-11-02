@@ -20,6 +20,9 @@ pub enum AgentError {
     /// Catch-all.
     #[error(transparent)]
     Other(#[from] anyhow::Error),
+    /// The selected provider has no deployment credential.
+    #[error("model provider {0} is unavailable: no API key configured")]
+    ProviderUnavailable(String),
     /// Unknown completion model
     #[error("unknown completion model [{0}]")]
     UnknownModel(String),

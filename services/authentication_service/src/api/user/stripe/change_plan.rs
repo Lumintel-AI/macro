@@ -53,6 +53,7 @@ pub async fn change_plan(
     user: MacroAuthorizationExtractor<AuthorizationService, UserOrInternal>,
     Json(req): Json<ChangePlanRequest>,
 ) -> Result<Json<ChangePlanResponse>, StripeOperationError> {
+    ctx.require_stripe()?;
     let user_id = &user.authorization.user.macro_user_id;
 
     // A member of a team billed per seat is billed through the team: move

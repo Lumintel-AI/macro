@@ -102,10 +102,37 @@ fn items_router(state: ApiContext) -> Router<ApiContext> {
 }
 
 fn api_router(state: ApiContext) -> Router {
-    let github_sync_service_router_state = GithubSyncRouterState {
-        service: state.github_sync_service.clone(),
-        entity_access_service: state.entity_access_service.clone(),
-        authorization_state: state.authorization_state.clone(),
+    let github_router = match state.github_sync_service.clone() {
+        Some(service) => {
+            github::inbound::github_sync_router::github_sync_router(GithubSyncRouterState {
+                service,
+                entity_access_service: state.entity_access_service.clone(),
+                authorization_state: state.authorization_state.clone(),
+            })
+        }
+        None => unavailable_router("GitHub App"),
+    };
+
+    let calls_configured = state.config.livekit_server_url.is_some()
+        && state.config.livekit_api_key.is_some()
+        && state.config.livekit_api_secret.is_some();
+    let call_routes = if calls_configured {
+        call::inbound::axum_router::call_router(state.call_state.clone())
+    } else {
+        unavailable_router("LiveKit")
+    };
+    let call_webhook_routes = if calls_configured {
+        call::inbound::axum_router::webhook_router(
+            state.call_webhook_state.clone(),
+            state.call_public_rate_limiter.clone(),
+        )
+    } else {
+        unavailable_router("LiveKit")
+    };
+    let internal_call_routes = if calls_configured {
+        call::inbound::axum_router::internal_call_router(state.call_internal_state.clone())
+    } else {
+        unavailable_router("LiveKit")
     };
 
     // Webhook router is outside auth — LiveKit validates via its own JWT,
@@ -118,35 +145,28 @@ fn api_router(state: ApiContext) -> Router {
                 state.call_public_rate_limiter.clone(),
             ),
         )
-        .nest(
-            "/call",
-            call::inbound::axum_router::webhook_router(
-                state.call_webhook_state.clone(),
-                state.call_public_rate_limiter.clone(),
-            ),
-        )
+        .nest("/call", call_webhook_routes)
         .nest(
             "/cal",
-            cal::inbound::cal_webhook_router::cal_webhook_router(state.cal_webhook_state.clone()),
+            state
+                .cal_webhook_state
+                .clone()
+                .map(cal::inbound::cal_webhook_router::cal_webhook_router)
+                .unwrap_or_else(|| unavailable_router("Cal and Meta")),
         );
 
     // Internal call router — agent-authenticated via x-macro-internal-call header.
-    let internal_call_router = Router::new().nest(
-        "/call",
-        call::inbound::axum_router::internal_call_router(state.call_internal_state.clone()),
-    );
+    let internal_call_router = Router::new().nest("/call", internal_call_routes);
 
     let internal_router = Router::new()
         .merge(sync::router())
         .nest(
             "/dictation",
-            dictation::inbound::axum_router::dictation_router(state.dictation_state.clone()),
+            state.dictation_state.clone().map(dictation::inbound::axum_router::dictation_router).unwrap_or_else(|| unavailable_router("Dictation: OPENAI_API_KEY is not configured")),
         )
         .nest(
             "/github",
-            github::inbound::github_sync_router::github_sync_router(
-                github_sync_service_router_state,
-            ),
+            github_router,
         )
         .nest(
             "/documents",
@@ -354,14 +374,12 @@ fn api_router(state: ApiContext) -> Router {
                 state.github_pull_request_state.clone(),
             )
             .merge(
-                github_pull_requests::inbound::changes_router::github_pull_request_changes_router(
-                    state.github_pull_request_changes_state.clone(),
-                ),
+                state.github_pull_request_changes_state.clone().map(github_pull_requests::inbound::changes_router::github_pull_request_changes_router).unwrap_or_else(|| unavailable_router("GitHub App")),
             ),
         )
         .nest(
             "/call",
-            call::inbound::axum_router::call_router(state.call_state.clone()),
+            call_routes,
         )
         .nest(
             "/webhook",
@@ -389,9 +407,7 @@ fn api_router(state: ApiContext) -> Router {
                 .nest("/notifications", notification::router())
                 .nest(
                     "/github",
-                    github::inbound::pull_request_index_router::pull_request_index_router(
-                        state.github_pull_request_index_state.clone(),
-                    ),
+                    state.github_pull_request_index_state.clone().map(github::inbound::pull_request_index_router::pull_request_index_router).unwrap_or_else(|| unavailable_router("GitHub App")),
                 )
                 .nest(
                     "/search",
@@ -424,4 +440,11 @@ fn api_router(state: ApiContext) -> Router {
     Router::new()
         .merge(dss_router.clone())
         .nest("/dss", dss_router)
+}
+
+/// Keep disabled integration routes explicit and return an actionable response.
+fn unavailable_router<S: Clone + Send + Sync + 'static>(integration: &'static str) -> Router<S> {
+    Router::new().fallback(move || async move {
+        (axum::http::StatusCode::SERVICE_UNAVAILABLE, axum::Json(serde_json::json!({"message": format!("{integration} is unavailable: integration is not configured")})))
+    })
 }

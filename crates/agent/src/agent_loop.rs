@@ -329,11 +329,11 @@ impl AgentLoop {
             |handle, prompt, tool_search, max_turns, max_tokens, telemetry| {
                 let router = match &self.router {
                     Some(router) => router,
-                    None => ModelRouter::shared().expect("failed to initialize model router"),
+                    None => ModelRouter::shared()?,
                 };
-                let routed = router.route_or_default(&self.model);
+                let routed = router.route_or_default(&self.model)?;
                 telemetry.set_model(routed.provider(), routed.model_name());
-                routed.into_agent(
+                Ok(routed.into_agent(
                     self.reasoning_effort,
                     self.speed,
                     handle,
@@ -342,7 +342,7 @@ impl AgentLoop {
                     max_turns,
                     max_tokens,
                     &telemetry,
-                )
+                ))
             },
         )
         .await
@@ -366,7 +366,7 @@ impl AgentLoop {
             usize,
             Option<u64>,
             GenAiContext,
-        ) -> ProviderAgent,
+        ) -> Result<ProviderAgent, AgentError>,
     ) -> Session
     where
         Context: Clone + Send + Sync + 'static,
@@ -552,14 +552,14 @@ impl AgentLoop {
             system_prompt,
             usage_ctx,
             move |handle, prompt, _, max_turns, max_tokens, telemetry| {
-                ProviderAgent::test(
+                Ok(ProviderAgent::test(
                     model,
                     &prompt.joined(),
                     max_turns,
                     max_tokens,
                     handle,
                     telemetry,
-                )
+                ))
             },
         )
         .await
@@ -593,9 +593,9 @@ impl AgentLoop {
             system_prompt,
             usage_ctx,
             |handle, prompt, tool_search, max_turns, max_tokens, telemetry| {
-                let routed = router.route_or_default(&self.model);
+                let routed = router.route_or_default(&self.model)?;
                 telemetry.set_model(routed.provider(), routed.model_name());
-                ProviderAgent::Test(Box::new(routed.into_agent(
+                Ok(ProviderAgent::Test(Box::new(routed.into_agent(
                     self.reasoning_effort,
                     self.speed,
                     handle,
@@ -604,7 +604,7 @@ impl AgentLoop {
                     max_turns,
                     max_tokens,
                     &telemetry,
-                )))
+                ))))
             },
         )
         .await
@@ -620,7 +620,7 @@ pub(crate) struct ToolSearch {
 
 /// A single streaming conversation session.
 pub struct Session {
-    agent: ProviderAgent,
+    agent: Result<ProviderAgent, AgentError>,
     history: Vec<Message>,
     max_turns: usize,
     /// What every turn's stream bridge is built from: tool routing, the
@@ -738,8 +738,11 @@ impl Session {
             (self.bridge_inputs.register_loaded)(called).await;
         }
 
-        let stream = self
+        let agent = self
             .agent
+            .as_ref()
+            .map_err(|error| AgentError::Other(anyhow::anyhow!("{error}")))?;
+        let stream = agent
             .run_stream(
                 prompt.clone(),
                 history.to_vec(),

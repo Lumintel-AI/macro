@@ -147,9 +147,14 @@ pub async fn run() -> anyhow::Result<()> {
 
     let internal_api_key = config.internal_api_key.clone();
 
-    let stripe_webhook_secret = secretsmanager_client
-        .get_maybe_secret_value(env, StripeWebhookSecretKey::new()?)
-        .await?;
+    let stripe_webhook_secret = match StripeWebhookSecretKey::new() {
+        Some(key) => Some(
+            secretsmanager_client
+                .get_maybe_secret_value(env, key)
+                .await?,
+        ),
+        None => None,
+    };
 
     tracing::trace!("initialized config");
 
@@ -195,13 +200,15 @@ pub async fn run() -> anyhow::Result<()> {
             .to_string(),
     };
 
-    let stripe_client_secret = match config.environment {
-        Environment::Local => config.stripe_secret_key.to_string().clone(),
-        _ => secretsmanager_client
-            .get_secret_value(&config.stripe_secret_key)
-            .await
-            .context("unable to get secret")?
-            .to_string(),
+    let stripe_client_secret = match config.stripe_secret_key.as_ref() {
+        Some(key) => Some(
+            secretsmanager_client
+                .get_maybe_secret_value(env, key)
+                .await?
+                .as_ref()
+                .to_owned(),
+        ),
+        None => None,
     };
 
     let google_client_secret = match config.environment {
@@ -270,7 +277,7 @@ pub async fn run() -> anyhow::Result<()> {
 
     tracing::trace!("initialized redis client");
 
-    let stripe_client = stripe::Client::new(stripe_client_secret);
+    let stripe_client = stripe_client_secret.map(stripe::Client::new);
     tracing::trace!("initialized stripe client");
 
     // `from_env` routes to local SMTP (Mailpit) when SMTP_HOST is set, else SES.
@@ -378,22 +385,28 @@ pub async fn run() -> anyhow::Result<()> {
         user_roles_and_permissions_macro_db,
     );
 
-    let stripe_prices = api::StripePrices {
-        premium: config.stripe_price_id.to_string(),
-        max: config
-            .stripe_max_price_id
-            .value()
-            .filter(|id| !id.trim().is_empty())
-            .map(str::to_owned),
-    };
-    if stripe_prices.max.is_none() {
+    let stripe_prices = config
+        .stripe_price_id
+        .as_ref()
+        .map(|price| api::StripePrices {
+            premium: price.to_string(),
+            max: config
+                .stripe_max_price_id
+                .value()
+                .filter(|id| !id.trim().is_empty())
+                .map(str::to_owned),
+        });
+    if stripe_prices
+        .as_ref()
+        .is_some_and(|prices| prices.max.is_none())
+    {
         tracing::warn!("STRIPE_MAX_PRICE_ID is not set; the Max plan cannot be sold");
     }
 
     let teams_repo_impl = TeamRepositoryImpl::new(db.clone());
-    let customer_repo_impl = CustomerRepositoryImpl::new(
+    let customer_repo_impl = CustomerRepositoryImpl::new_optional(
         stripe_client.clone(),
-        stripe_prices.seat_prices(),
+        stripe_prices.as_ref().map(api::StripePrices::seat_prices),
         db.clone(),
     );
     let favorites_service = favorites::domain::service::FavoritesServiceImpl::new(
@@ -496,10 +509,17 @@ pub async fn run() -> anyhow::Result<()> {
                 macro_event_broker.clone(),
             ),
         ),
-        GithubLinkConfig {
-            client_id: config.github_client_id.to_string(),
-            client_secret: config.github_client_secret.to_string(),
-            idp_id: config.github_idp_id.to_string(),
+        match (
+            config.github_client_id.as_ref(),
+            config.github_client_secret.as_ref(),
+            config.github_idp_id.as_ref(),
+        ) {
+            (Some(id), Some(secret), Some(idp)) => Some(GithubLinkConfig {
+                client_id: id.to_string(),
+                client_secret: secret.to_string(),
+                idp_id: idp.to_string(),
+            }),
+            _ => None,
         },
     );
 
@@ -514,7 +534,7 @@ pub async fn run() -> anyhow::Result<()> {
 
     let referral_service = ReferralServiceImpl {
         repo: PgReferralRepo::new(db.clone()),
-        discount_client: StripeDiscountClient::new(
+        discount_client: StripeDiscountClient::new_optional(
             stripe_client.clone(),
             10000, /*100$ credit, in cents*/
         ),
@@ -544,16 +564,16 @@ pub async fn run() -> anyhow::Result<()> {
         None
     };
 
-    let plan_customer = CustomerRepositoryImpl::new(
+    let plan_customer = CustomerRepositoryImpl::new_optional(
         stripe_client.clone(),
-        stripe_prices.seat_prices(),
+        stripe_prices.as_ref().map(api::StripePrices::seat_prices),
         db.clone(),
     );
-    let stripe_client = Arc::new(stripe_client);
-    let plan_gateway = crate::outbound::subscription_plan::StripePlanGateway::new(
+    let stripe_client = stripe_client.map(Arc::new);
+    let plan_gateway = crate::outbound::subscription_plan::StripePlanGateway::new_optional(
         db.clone(),
         stripe_client.clone(),
-        stripe_prices.seat_prices(),
+        stripe_prices.as_ref().map(api::StripePrices::seat_prices),
         plan_customer,
     );
     let subscription_plan = Arc::new(crate::service::subscription_plan::PlanService::new(
@@ -571,14 +591,16 @@ pub async fn run() -> anyhow::Result<()> {
     let gtm_invite_service = Arc::new(gtm_invite_service);
     let subscription_checkout =
         Arc::new(crate::service::subscription_checkout::CheckoutService::new(
-            crate::outbound::subscription_checkout::StripeCheckoutGateway::new(
+            crate::outbound::subscription_checkout::StripeCheckoutGateway::new_optional(
                 db.clone(),
                 stripe_client.clone(),
                 gtm_invite_service.clone(),
-                stripe_prices.seat_prices(),
+                stripe_prices.as_ref().map(api::StripePrices::seat_prices),
             ),
         ));
-    let ai_payment_gateway = ai_billing::outbound::StripePaymentGateway::new(stripe_client.clone());
+    let ai_payment_gateway = stripe_client
+        .clone()
+        .map(ai_billing::outbound::StripePaymentGateway::new);
     let ai_pricing = config.ai_pricing();
     let ai_billing_service = Arc::new(
         ai_billing::domain::BillingServiceImpl::new(
@@ -661,7 +683,7 @@ pub async fn run() -> anyhow::Result<()> {
     );
     invite_reminders.close();
     let user_deletion = Arc::new(
-        crate::outbound::user_deletion::UserDeletionAdapter::new(
+        crate::outbound::user_deletion::UserDeletionAdapter::new_optional(
             db.clone(),
             document_storage_service_client.clone(),
             teams_service.clone(),

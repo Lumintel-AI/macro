@@ -153,7 +153,7 @@ pub struct Config {
     /// Dedicated Codex envelope encryption CMK; absent deployments return 503 for Codex.
     pub codex_oauth_kms_key_id: CodexOauthKmsKeyId,
     /// Stripe secret key
-    pub stripe_secret_key: StripeSecretKey,
+    pub stripe_secret_key: Option<StripeSecretKey>,
     /// The port to listen for HTTP requests on.
     #[macro_config_default(8080)]
     pub port: usize,
@@ -163,11 +163,11 @@ pub struct Config {
     /// The internal auth key used by other services
     pub service_internal_auth_key: ServiceInternalAuthKey,
     /// The github client id
-    pub github_client_id: GithubClientId,
+    pub github_client_id: Option<GithubClientId>,
     /// The github client secret
-    pub github_client_secret: GithubClientSecret,
+    pub github_client_secret: Option<GithubClientSecret>,
     /// The github idp id
-    pub github_idp_id: GithubIdpId,
+    pub github_idp_id: Option<GithubIdpId>,
     /// Signs the `state` carried through account-link OAuth flows. Checked
     /// for length by [`Config::account_link_state_key`] at startup.
     pub account_link_state_secret: AccountLinkStateSecret,
@@ -202,7 +202,7 @@ pub struct Config {
     /// Hours a GTM invite link can be opened and redeemed (optional, defaults to 48).
     pub gtm_invite_link_ttl_hours: GtmInviteLinkTtlHours,
     /// The stripe price id for the Premium plan seat
-    pub stripe_price_id: StripePriceId,
+    pub stripe_price_id: Option<StripePriceId>,
     /// The stripe price id for the Max plan seat (optional, see
     /// [`StripeMaxPriceId`])
     pub stripe_max_price_id: StripeMaxPriceId,

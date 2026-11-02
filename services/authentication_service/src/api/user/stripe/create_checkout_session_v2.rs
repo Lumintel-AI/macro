@@ -75,6 +75,7 @@ pub async fn create_checkout_session<Eas: EntityAccessService>(
     optional_team: OptionalMacroUserTeamExtractorV2<OwnerTeamRole, Eas, AuthorizationService>,
     Json(req): Json<CreateCheckoutSessionV2Request>,
 ) -> Result<Json<CheckoutSessionV2Response>, StripeOperationError> {
+    ctx.require_stripe()?;
     // Build subscription metadata from optional tracking fields
     let mut metadata = std::collections::HashMap::new();
 

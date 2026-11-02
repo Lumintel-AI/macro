@@ -25,6 +25,7 @@ pub async fn trial_eligibility(
     State(ctx): State<ApiContext>,
     user: MacroAuthorizationExtractor<AuthorizationService, UserOrInternal>,
 ) -> Result<Json<TrialEligibility>, StripeOperationError> {
+    ctx.require_stripe()?;
     Ok(Json(
         ctx.subscription_checkout
             .trial_eligibility(&user.authorization.user.macro_user_id)

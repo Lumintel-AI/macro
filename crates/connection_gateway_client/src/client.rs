@@ -9,6 +9,7 @@ use model_entity::Entity;
 
 mod calendar;
 mod email;
+mod job_update;
 
 /// How long any one call to the connection gateway may take.
 ///
@@ -79,6 +80,7 @@ impl ConnectionGatewayClient {
             .json(&body)
             .send()
             .await?
+            .error_for_status()?
             .json()
             .await?;
 

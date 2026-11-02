@@ -69,3 +69,7 @@ event contract (schema, sanitization, delivery semantics).
 ## Related
 
 - Docs: `crates/teams/README.md` · Rules: `.agents/rules/rust/db.md`
+
+## Optional billing adapter
+
+`CustomerRepositoryImpl::new_optional` accepts optional Stripe credentials and seat prices. Free-team operations remain independent. Provider-backed billing methods reject absent configuration.

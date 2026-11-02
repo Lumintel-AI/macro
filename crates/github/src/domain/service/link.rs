@@ -42,7 +42,7 @@ pub struct GithubLinkServiceImpl<
     oauth: U,
     auth: F,
     pull_request_service: E,
-    config: super::GithubLinkConfig,
+    config: Option<super::GithubLinkConfig>,
 }
 
 impl<R: GithubRepo, U: GithubOauth, F: Auth, E: GithubPullRequestService>
@@ -54,15 +54,23 @@ impl<R: GithubRepo, U: GithubOauth, F: Auth, E: GithubPullRequestService>
         oauth: U,
         auth: F,
         pull_request_service: E,
-        config: super::GithubLinkConfig,
+        config: impl Into<Option<super::GithubLinkConfig>>,
     ) -> Self {
         Self {
             repo,
             oauth,
             auth,
             pull_request_service,
-            config,
+            config: config.into(),
         }
+    }
+
+    fn config(&self) -> Result<&super::GithubLinkConfig, GithubError> {
+        self.config.as_ref().ok_or_else(|| {
+            GithubError::Internal(anyhow::anyhow!(
+                "GitHub OAuth is unavailable: integration is not configured"
+            ))
+        })
     }
 
     async fn find_user_link(
@@ -95,7 +103,7 @@ impl<R: GithubRepo, U: GithubOauth, F: Auth, E: GithubPullRequestService>
             .auth
             .retreive_access_token(
                 &link.fusionauth_user_id,
-                &self.config.idp_id,
+                &self.config()?.idp_id,
                 &link.github_user_id,
             )
             .await
@@ -207,7 +215,7 @@ impl<R: GithubRepo, U: GithubOauth, F: Auth, E: GithubPullRequestService> Github
     #[tracing::instrument(skip(self), err)]
     fn construct_oauth_url(&self, redirect_uri: &str, state: &str) -> Result<String, GithubError> {
         self.oauth
-            .construct_oauth_url(&self.config.client_id, redirect_uri, state)
+            .construct_oauth_url(&self.config()?.client_id, redirect_uri, state)
             .map_err(|e| GithubError::Internal(e.into()))
     }
 
@@ -462,7 +470,7 @@ impl<R: GithubRepo, U: GithubOauth, F: Auth, E: GithubPullRequestService> Github
             // This is the last/only row for this GitHub account: unlink
             // FusionAuth (and clear the Redis cache) before removing the row.
             self.auth
-                .delete_user_link(&link, &self.config.idp_id)
+                .delete_user_link(&link, &self.config()?.idp_id)
                 .await
                 .map_err(|e| GithubError::Internal(e.into()))?;
         }
@@ -488,8 +496,8 @@ impl<R: GithubRepo, U: GithubOauth, F: Auth, E: GithubPullRequestService> Github
         let tokens = self
             .oauth
             .exchange_oauth_code_for_tokens(
-                &self.config.client_id,
-                &self.config.client_secret,
+                &self.config()?.client_id,
+                &self.config()?.client_secret,
                 redirect_uri,
                 code,
             )
@@ -537,7 +545,7 @@ impl<R: GithubRepo, U: GithubOauth, F: Auth, E: GithubPullRequestService> Github
                     .auth
                     .link_user(
                         &owner.fusionauth_user_id,
-                        &self.config.idp_id,
+                        &self.config()?.idp_id,
                         &gh_id,
                         &user_info.login,
                         &tokens.access_token,
@@ -551,7 +559,7 @@ impl<R: GithubRepo, U: GithubOauth, F: Auth, E: GithubPullRequestService> Github
                         .auth
                         .link_user(
                             fusionauth_user_id,
-                            &self.config.idp_id,
+                            &self.config()?.idp_id,
                             &gh_id,
                             &user_info.login,
                             &tokens.access_token,
@@ -585,7 +593,7 @@ impl<R: GithubRepo, U: GithubOauth, F: Auth, E: GithubPullRequestService> Github
                     .auth
                     .link_user(
                         fusionauth_user_id,
-                        &self.config.idp_id,
+                        &self.config()?.idp_id,
                         &gh_id,
                         &user_info.login,
                         &tokens.access_token,

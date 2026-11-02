@@ -5,6 +5,9 @@ publish = false
 version = "0.1.0"
 
 [dependencies]
+connection_gateway_client = { path = "../connection_gateway_client" }
+macro_env_var = { path = "../macro_env_var" }
+macro_service_urls = { path = "../macro_service_urls" }
 anyhow = { workspace = true }
 aws-sdk-lambda = { workspace = true }
 aws-smithy-types = { workspace = true }

@@ -19,12 +19,6 @@ fn is_local_stripe_stub() -> bool {
         .is_some_and(|key| key == LOCAL_STRIPE_SECRET_STUB)
 }
 
-/// A unique placeholder Stripe customer id for local signups. `stripe_customer_id`
-/// has a UNIQUE constraint, so it must be unique per user.
-fn local_stripe_customer_id(email: &str) -> String {
-    format!("local-stripe-customer-{email}")
-}
-
 /// Creates a new user
 /// This is a fairly involved process and as such will be well documented and broken up into
 /// multiple easy-to-follow functions
@@ -37,9 +31,9 @@ pub async fn create_user(
     email: &str,
     is_verified: bool,
     db: &sqlx::Pool<sqlx::Postgres>,
-    stripe_client: &stripe::Client,
+    stripe_client: Option<&stripe::Client>,
 ) -> anyhow::Result<(String, Option<i32>)> {
-    let stripe_customer_id = if is_local_stripe_stub() {
+    let stripe_customer_id = if stripe_client.is_none() || is_local_stripe_stub() {
         // Local mode uses a stub key; don't call Stripe (it would 401 and
         // abort the transactional user.create webhook, blocking all signups).
         tracing::info!("skipping Stripe customer creation for the local Stripe stub");
@@ -48,6 +42,8 @@ pub async fn create_user(
         // NOTE: stripe adds in ~400ms of latency to this request. We may want to update our
         // requirement that each customer exists in stripe and create stripe customers as needed.
         let start_time = std::time::Instant::now();
+        let stripe_client =
+            stripe_client.ok_or_else(|| anyhow::anyhow!("Stripe is unavailable"))?;
         let stripe_customer = create_stripe_user(email, stripe_client).await?;
         tracing::info!(
             stripe_customer_id = %stripe_customer.id,
@@ -56,12 +52,6 @@ pub async fn create_user(
         );
         Some(stripe_customer.id.to_string())
     };
-    // The legacy account key is required, but a profile without a real Stripe
-    // customer must leave billing absent so free team creation skips Stripe.
-    let macro_user_customer_id = stripe_customer_id
-        .clone()
-        .unwrap_or_else(|| local_stripe_customer_id(email));
-
     let organization_id = match_user_to_organization(db, email).await?;
 
     let roles = match organization_id {
@@ -80,7 +70,7 @@ pub async fn create_user(
         username,
         email,
         is_verified,
-        &macro_user_customer_id,
+        stripe_customer_id.as_deref(),
         stripe_customer_id.as_deref(),
         organization_id,
         roles,

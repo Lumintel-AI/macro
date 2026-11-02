@@ -34,3 +34,7 @@ invite-to-Macro flow.
 ## Related
 
 - Rules: `.agents/rules/rust/architecture.md`
+
+## Optional discounts
+
+`StripeDiscountClient::new_optional` accepts no Stripe client. Discount operations then return an unavailable error before a provider request.

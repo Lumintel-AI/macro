@@ -208,6 +208,9 @@ pub fn spawn_task_duplicate_detection(
     lexical_client: Arc<LexicalClient>,
     mut task: NewTask,
 ) {
+    if !task_dedup_service.is_available() {
+        return;
+    }
     tokio::spawn(async move {
         match lexical_client
             .get_embedding_markdown(&task.document_id)
@@ -229,6 +232,7 @@ pub fn spawn_task_duplicate_detection(
 
 fn task_dedup_error(error: TaskDedupError) -> DocumentError {
     match error {
+        TaskDedupError::Unavailable => DocumentError::Unavailable(error.to_string()),
         TaskDedupError::MatchNotFound => {
             DocumentError::NotFound("duplicate match not found".to_string())
         }

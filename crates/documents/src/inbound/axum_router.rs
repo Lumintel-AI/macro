@@ -133,6 +133,7 @@ impl IntoResponse for DocumentError {
         }
 
         let status_code = match &self {
+            DocumentError::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             DocumentError::NotFound(_) => StatusCode::NOT_FOUND,
             DocumentError::Unauthorized => StatusCode::UNAUTHORIZED,
             DocumentError::Gone => StatusCode::GONE,

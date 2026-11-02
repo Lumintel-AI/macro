@@ -2,7 +2,7 @@ use std::sync::Mutex;
 
 use macro_env_var::optional_read_env_var;
 
-use super::{LOCAL_STRIPE_SECRET_STUB, is_local_stripe_stub, local_stripe_customer_id};
+use super::{LOCAL_STRIPE_SECRET_STUB, is_local_stripe_stub};
 
 /// Tests mutate the process env, which is process-global; serialize them so
 /// they can't interleave.
@@ -50,12 +50,4 @@ fn missing_key_is_not_detected_as_stub() {
     with_stripe_key(None, || {
         assert!(!is_local_stripe_stub());
     });
-}
-
-#[test]
-fn local_stripe_customer_id_is_unique_per_email() {
-    let alice = local_stripe_customer_id("alice@seed.macro.local");
-    let bob = local_stripe_customer_id("bob@seed.macro.local");
-    assert_ne!(alice, bob);
-    assert!(alice.contains("alice@seed.macro.local"));
 }

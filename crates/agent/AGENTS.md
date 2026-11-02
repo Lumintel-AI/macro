@@ -74,3 +74,7 @@ Compatible Chat Completions provider requests omit those unsupported tool images
 with an explicit explanation; they never stringify encoded pixels into prompts.
 Model-request telemetry records native image counts without requiring content
 capture; image pixels remain excluded by genai_telemetry.
+
+## Optional model providers
+
+Model routing registers only configured API credentials. Missing providers return `AgentError::ProviderUnavailable`; they never trigger a paid fallback to another configured provider. Unknown model names retain the upstream default-model fallback. Session construction stores routing failures and reports them from `send_message` without panicking.

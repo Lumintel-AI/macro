@@ -197,3 +197,16 @@ async fn guest_tokens_preserve_names_and_only_grant_the_room() {
     assert_eq!(event.guest_identity, Some(guest_id));
     assert_eq!(event.participant_identity, None);
 }
+
+#[tokio::test]
+async fn unconfigured_rtc_refuses_rooms_and_tokens_without_network_access() {
+    let client = LivekitRtcClient::unconfigured();
+    assert!(client.create_room("test-room").await.is_err());
+    assert!(client.list_rooms().await.is_err());
+    assert!(
+        client
+            .generate_token("test-room", "macro|user@example.com".parse().unwrap())
+            .await
+            .is_err()
+    );
+}

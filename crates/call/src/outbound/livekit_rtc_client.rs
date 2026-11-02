@@ -31,7 +31,36 @@ use crate::domain::ports::CallRtcClient;
 const VOIP_TOKEN_MINT_CONCURRENCY: usize = 16;
 
 /// LiveKit implementation of [`CallRtcClient`].
+/// Optional LiveKit adapter. Unconfigured calls fail before contacting a provider.
 pub struct LivekitRtcClient {
+    inner: Option<ConfiguredLivekitRtcClient>,
+}
+
+impl LivekitRtcClient {
+    /// Build a configured RTC adapter.
+    pub fn new(
+        server_url: &str,
+        api_key: impl Into<String>,
+        api_secret: impl Into<String>,
+        transcription_agent_name: Option<String>,
+    ) -> Self {
+        Self {
+            inner: Some(ConfiguredLivekitRtcClient::new(
+                server_url,
+                api_key,
+                api_secret,
+                transcription_agent_name,
+            )),
+        }
+    }
+
+    /// Leave calls unavailable without constructing a LiveKit client.
+    pub fn unconfigured() -> Self {
+        Self { inner: None }
+    }
+}
+
+struct ConfiguredLivekitRtcClient {
     room_client: RoomClient,
     egress_client: EgressClient,
     agent_dispatch_client: AgentDispatchClient,
@@ -43,7 +72,7 @@ pub struct LivekitRtcClient {
     transcription_agent_name: Option<String>,
 }
 
-impl LivekitRtcClient {
+impl ConfiguredLivekitRtcClient {
     /// Create a new LiveKit RTC client.
     ///
     /// # Arguments
@@ -124,7 +153,7 @@ fn build_room_composite_egress_request(
     }
 }
 
-impl CallRtcClient for LivekitRtcClient {
+impl CallRtcClient for ConfiguredLivekitRtcClient {
     #[tracing::instrument(err, skip(self))]
     async fn prepare_room(&self, room_name: &str) -> anyhow::Result<()> {
         self.room_client
@@ -461,4 +490,137 @@ fn is_not_found(error: &ServiceError) -> bool {
         error,
         ServiceError::Twirp(TwirpError::Twirp(code)) if code.code == TwirpErrorCode::NOT_FOUND
     )
+}
+
+impl CallRtcClient for LivekitRtcClient {
+    async fn prepare_room(&self, room_name: &str) -> anyhow::Result<()> {
+        let inner = self.inner.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+        })?;
+        inner.prepare_room(room_name).await
+    }
+    async fn create_room(&self, room_name: &str) -> anyhow::Result<()> {
+        let inner = self.inner.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+        })?;
+        inner.create_room(room_name).await
+    }
+    async fn delete_room(&self, room_name: &str) -> anyhow::Result<()> {
+        let inner = self.inner.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+        })?;
+        inner.delete_room(room_name).await
+    }
+    async fn list_rooms(&self) -> anyhow::Result<Vec<RtcRoom>> {
+        let inner = self.inner.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+        })?;
+        inner.list_rooms().await
+    }
+    async fn generate_token(
+        &self,
+        room_name: &str,
+        participant_identity: MacroUserIdStr<'_>,
+    ) -> anyhow::Result<String> {
+        let inner = self.inner.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+        })?;
+        inner.generate_token(room_name, participant_identity).await
+    }
+    async fn generate_guest_token(
+        &self,
+        room_name: &str,
+        guest_id: GuestId,
+        display_name: &str,
+    ) -> anyhow::Result<String> {
+        let inner = self.inner.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+        })?;
+        inner
+            .generate_guest_token(room_name, guest_id, display_name)
+            .await
+    }
+    async fn remove_guest(&self, room_name: &str, guest_id: GuestId) -> anyhow::Result<()> {
+        let inner = self.inner.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+        })?;
+        inner.remove_guest(room_name, guest_id).await
+    }
+    async fn build_voip_push_payloads<'a>(
+        &self,
+        request: VoipPushPayloadRequest<'a>,
+    ) -> Vec<(MacroUserIdStr<'static>, VoipPushPayload)> {
+        let Some(inner) = &self.inner else {
+            return Vec::new();
+        };
+        inner.build_voip_push_payloads(request).await
+    }
+    async fn remove_participant(
+        &self,
+        room_name: &str,
+        participant_identity: MacroUserIdStr<'_>,
+    ) -> anyhow::Result<()> {
+        let inner = self.inner.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+        })?;
+        inner
+            .remove_participant(room_name, participant_identity)
+            .await
+    }
+    async fn list_meeting_participants(
+        &self,
+        room_name: &str,
+    ) -> anyhow::Result<Option<Vec<crate::domain::meetings::MeetingRtcParticipant>>> {
+        let inner = self.inner.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+        })?;
+        inner.list_meeting_participants(room_name).await
+    }
+    async fn list_participant_identities(
+        &self,
+        room_name: &str,
+    ) -> anyhow::Result<Option<Vec<String>>> {
+        let inner = self.inner.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+        })?;
+        inner.list_participant_identities(room_name).await
+    }
+    async fn start_room_composite_egress(
+        &self,
+        room_name: &str,
+        s3_config: &EgressS3Config,
+    ) -> anyhow::Result<String> {
+        let inner = self.inner.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+        })?;
+        inner
+            .start_room_composite_egress(room_name, s3_config)
+            .await
+    }
+    async fn stop_egress(&self, egress_id: &str) -> anyhow::Result<()> {
+        let inner = self.inner.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+        })?;
+        inner.stop_egress(egress_id).await
+    }
+    async fn dispatch_transcription_agent(&self, room_name: &str) -> anyhow::Result<()> {
+        let inner = self.inner.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+        })?;
+        inner.dispatch_transcription_agent(room_name).await
+    }
+    fn verify_access_token(&self, token: &str) -> anyhow::Result<VerifiedRingToken> {
+        let inner = self.inner.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("LiveKit is unavailable: integration is not configured")
+        })?;
+        inner.verify_access_token(token)
+    }
+    fn receive_webhook(&self, body: &str, auth_token: &str) -> Result<CallWebhookEvent, CallError> {
+        let inner = self.inner.as_ref().ok_or_else(|| {
+            CallError::Internal(anyhow::anyhow!(
+                "LiveKit is unavailable: integration is not configured"
+            ))
+        })?;
+        inner.receive_webhook(body, auth_token)
+    }
 }

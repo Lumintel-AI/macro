@@ -640,55 +640,78 @@ pub async fn run() -> anyhow::Result<()> {
         } else {
             app_url.to_string()
         };
-    let github_sync_service_impl = GithubSyncServiceImpl::new(
-        GithubSyncConfig {
-            app_url: github_app_origin
-                .parse()
-                .context("app URL must be a valid URL")?,
-            webhook_secret: config.github_webhook_secret_key.as_ref().to_string(),
-            github_sync_app_url: config.github_sync_app_url.to_string(),
-            sync_app_pem: config.github_sync_app_pem_secret_key.as_ref().to_string(),
-            sync_app_client_id: config.github_sync_app_client_id.to_string(),
-            sync_app_client_secret: config.github_sync_app_client_secret.to_string(),
-            installation_state_secret: config.github_installation_state_secret.to_string(),
-        },
-        document_service.clone(),
-        Arc::new(
-            GithubPullRequestServiceImpl::new(
-                ForeignEntityServiceImpl::new(PgForeignEntityRepo::new(db.clone())),
-                PgGithubPullRequestRepo::new(db.clone()),
-            )
-            .with_event_publisher(
-                github_pull_requests::broker::BrokerGithubPullRequestPublisher(
-                    macro_event_broker.clone(),
+    let (github_sync_service_impl, github_pull_request_index_state) = match (
+        config.github_sync_app_url.as_ref(),
+        config.github_sync_app_client_id.as_ref(),
+        config.github_installation_state_secret.as_ref(),
+        config.github_sync_app_client_secret.as_ref(),
+        config.github_webhook_secret_key.0.as_ref(),
+        config.github_sync_app_pem_secret_key.0.as_ref(),
+    ) {
+        (
+            Some(app_url),
+            Some(client_id),
+            Some(state_secret),
+            Some(client_secret),
+            Some(webhook_secret),
+            Some(pem),
+        ) => {
+            let github_sync_service_impl = GithubSyncServiceImpl::new(
+                GithubSyncConfig {
+                    app_url: github_app_origin
+                        .parse()
+                        .context("app URL must be a valid URL")?,
+                    webhook_secret: webhook_secret.as_ref().to_string(),
+                    github_sync_app_url: app_url.to_string(),
+                    sync_app_pem: pem.as_ref().to_string(),
+                    sync_app_client_id: client_id.to_string(),
+                    sync_app_client_secret: client_secret.to_string(),
+                    installation_state_secret: state_secret.to_string(),
+                },
+                document_service.clone(),
+                Arc::new(
+                    GithubPullRequestServiceImpl::new(
+                        ForeignEntityServiceImpl::new(PgForeignEntityRepo::new(db.clone())),
+                        PgGithubPullRequestRepo::new(db.clone()),
+                    )
+                    .with_event_publisher(
+                        github_pull_requests::broker::BrokerGithubPullRequestPublisher(
+                            macro_event_broker.clone(),
+                        ),
+                    ),
                 ),
-            ),
-        ),
-        (*notification_ingress_service).clone(),
-        PgGithubSyncRepo::new(db.clone()),
-        GithubSyncClientImpl::default(),
-        ConnectionGatewayGithubRealtime::new(conn_gateway_client.clone()),
-    )
-    .with_webhook_publisher(github::broker::BrokerGithubWebhookPublisher(
-        macro_event_broker.clone(),
-    ));
+                (*notification_ingress_service).clone(),
+                PgGithubSyncRepo::new(db.clone()),
+                GithubSyncClientImpl::default(),
+                ConnectionGatewayGithubRealtime::new(conn_gateway_client.clone()),
+            )
+            .with_webhook_publisher(github::broker::BrokerGithubWebhookPublisher(
+                macro_event_broker.clone(),
+            ));
 
-    let github_pull_request_index_state = PullRequestIndexRouterState {
-        service: Arc::new(PullRequestIndexService::new(
-            InstallationTokenConfig {
-                client_id: config.github_sync_app_client_id.to_string(),
-                private_key_pem: config.github_sync_app_pem_secret_key.as_ref().to_string(),
-            },
-            PgGithubSyncRepo::new(db.clone()),
-            GithubSyncClientImpl::default(),
-            GithubPullRequestServiceImpl::new(
-                ForeignEntityServiceImpl::new(PgForeignEntityRepo::new(db.clone())),
-                PgGithubPullRequestRepo::new(db.clone()),
-            ),
-        )),
-        authorization_state: authorization_state.clone(),
+            let github_pull_request_index_state = PullRequestIndexRouterState {
+                service: Arc::new(PullRequestIndexService::new(
+                    InstallationTokenConfig {
+                        client_id: client_id.to_string(),
+                        private_key_pem: pem.as_ref().to_string(),
+                    },
+                    PgGithubSyncRepo::new(db.clone()),
+                    GithubSyncClientImpl::default(),
+                    GithubPullRequestServiceImpl::new(
+                        ForeignEntityServiceImpl::new(PgForeignEntityRepo::new(db.clone())),
+                        PgGithubPullRequestRepo::new(db.clone()),
+                    ),
+                )),
+                authorization_state: authorization_state.clone(),
+            };
+
+            (
+                Some(Arc::new(github_sync_service_impl)),
+                Some(github_pull_request_index_state),
+            )
+        }
+        _ => (None, None),
     };
-
     let github_pull_request_state = GithubPullRequestRouterState::new(
         Arc::new(GithubPullRequestServiceImpl::new(
             ForeignEntityServiceImpl::new(PgForeignEntityRepo::new(db.clone())),
@@ -698,68 +721,82 @@ pub async fn run() -> anyhow::Result<()> {
         authorization_state.clone(),
     );
 
-    let github_pull_request_changes_state = GithubPullRequestChangesRouterState::new(
-        Arc::new(GithubPullRequestChangesServiceImpl::new(
-            GithubPullRequestServiceImpl::new(
-                ForeignEntityServiceImpl::new(PgForeignEntityRepo::new(db.clone())),
-                PgGithubPullRequestRepo::new(db.clone()),
-            ),
-            GithubPullRequestChangesetStore::new(
-                GithubPullRequestDiffClient::new(InstallationTokenService::new(
-                    InstallationTokenConfig {
-                        client_id: config.github_sync_app_client_id.to_string(),
-                        private_key_pem: config.github_sync_app_pem_secret_key.as_ref().to_string(),
-                    },
-                    PgGithubSyncRepo::new(db.clone()),
-                    GithubSyncClientImpl::default(),
+    let github_pull_request_changes_state = match (
+        config.github_sync_app_client_id.as_ref(),
+        config.github_sync_app_pem_secret_key.0.as_ref(),
+    ) {
+        (Some(client_id), Some(pem)) => {
+            let github_pull_request_changes_state = GithubPullRequestChangesRouterState::new(
+                Arc::new(GithubPullRequestChangesServiceImpl::new(
+                    GithubPullRequestServiceImpl::new(
+                        ForeignEntityServiceImpl::new(PgForeignEntityRepo::new(db.clone())),
+                        PgGithubPullRequestRepo::new(db.clone()),
+                    ),
+                    GithubPullRequestChangesetStore::new(
+                        GithubPullRequestDiffClient::new(InstallationTokenService::new(
+                            InstallationTokenConfig {
+                                client_id: client_id.to_string(),
+                                private_key_pem: pem.as_ref().to_string(),
+                            },
+                            PgGithubSyncRepo::new(db.clone()),
+                            GithubSyncClientImpl::default(),
+                        )),
+                        PgGithubPullRequestRepo::new(db.clone()),
+                        S3GithubPullRequestPatchStore::new(
+                            macro_aws_config::s3_client().await,
+                            config.github_pull_request_patch_bucket.to_string(),
+                        ),
+                    ),
                 )),
-                PgGithubPullRequestRepo::new(db.clone()),
-                S3GithubPullRequestPatchStore::new(
-                    macro_aws_config::s3_client().await,
-                    config.github_pull_request_patch_bucket.to_string(),
-                ),
-            ),
-        )),
-        entity_access_service.clone(),
-        authorization_state.clone(),
-    );
+                entity_access_service.clone(),
+                authorization_state.clone(),
+            );
 
+            Some(github_pull_request_changes_state)
+        }
+        _ => None,
+    };
     let foreign_entity_state = ForeignEntityRouterState::new(
         foreign_entity_service.clone(),
         entity_access_service.clone(),
         authorization_state.clone(),
     );
 
-    // Cal.com webhooks → Meta Lead events. Both secrets are loaded here
-    // (rather than on Config) to keep cal/Meta wiring colocated.
-    let cal_webhook_secret = secretsmanager_client
-        .get_maybe_secret_value(env, CalWebhookSecretKey::new()?)
-        .await?;
-    let cal_event_type_content_names_secret = secretsmanager_client
-        .get_maybe_secret_value(env, CalEventTypeContentNamesKey::new()?)
-        .await?;
-
-    let analytics_client = Arc::new(AnalyticsClient::new(AnalyticsClientConfig {
-        google_analytics: None,
-        meta: Some(MetaConfig {
-            pixel_id: MetaPixelId::new()?.as_ref().to_string(),
-            access_token: MetaAccessToken::new()?.as_ref().to_string(),
-            test_event_code: MetaTestEventCode::new().map(|v| v.as_ref().to_string()),
-        }),
-        posthog: None,
-    }));
-
-    let cal_event_type_meta: std::collections::HashMap<u64, CalEventMeta> =
-        serde_json::from_str(cal_event_type_content_names_secret.as_ref())
-            .context("CalEventTypeContentNames secret must be a JSON object mapping eventTypeId (u64) to { content_name: string, value: number (USD) }")?;
-    let cal_webhook_service = CalWebhookServiceImpl::new(
-        CalConfig {
-            webhook_secret: cal_webhook_secret.as_ref().to_string(),
-            event_type_meta: cal_event_type_meta,
-        },
-        AnalyticsClientSink::new(analytics_client.clone()),
-    );
-    let cal_webhook_state = CalWebhookRouterState::new(cal_webhook_service);
+    let cal_webhook_state = match (
+        config.cal_webhook_secret_key.as_ref(),
+        config.cal_event_type_content_names_key.as_ref(),
+        config.meta_pixel_id.as_ref(),
+        config.meta_access_token.as_ref(),
+    ) {
+        (Some(webhook_key), Some(event_key), Some(pixel_id), Some(access_token)) => {
+            let webhook_secret = secretsmanager_client
+                .get_maybe_secret_value(env, webhook_key)
+                .await?;
+            let event_meta = secretsmanager_client
+                .get_maybe_secret_value(env, event_key)
+                .await?;
+            let analytics = Arc::new(AnalyticsClient::new(AnalyticsClientConfig {
+                google_analytics: None,
+                meta: Some(MetaConfig {
+                    pixel_id: pixel_id.to_string(),
+                    access_token: access_token.to_string(),
+                    test_event_code: config.meta_test_event_code.value().map(str::to_owned),
+                }),
+                posthog: None,
+            }));
+            let event_type_meta: std::collections::HashMap<u64, CalEventMeta> =
+                serde_json::from_str(event_meta.as_ref())
+                    .context("CAL_EVENT_TYPE_CONTENT_NAMES_KEY must contain a JSON object")?;
+            Some(CalWebhookRouterState::new(CalWebhookServiceImpl::new(
+                CalConfig {
+                    webhook_secret: webhook_secret.as_ref().to_owned(),
+                    event_type_meta,
+                },
+                AnalyticsClientSink::new(analytics),
+            )))
+        }
+        _ => None,
+    };
 
     // Call service (LiveKit)
     let transcription_agent_name = config
@@ -774,12 +811,19 @@ pub async fn run() -> anyhow::Result<()> {
         "LIVEKIT_TRANSCRIPTION_AGENT_NAME is set but INTERNAL_CALL_SECRET is missing — \
          the transcription agent will not be able to submit transcripts"
     );
-    let livekit_rtc_client = LivekitRtcClient::new(
+    let livekit_rtc_client = match (
         config.livekit_server_url.as_ref(),
         config.livekit_api_key.as_ref(),
         config.livekit_api_secret.as_ref(),
-        transcription_agent_name,
-    );
+    ) {
+        (Some(url), Some(key), Some(secret)) => LivekitRtcClient::new(
+            url.as_ref(),
+            key.to_string(),
+            secret.to_string(),
+            transcription_agent_name,
+        ),
+        _ => LivekitRtcClient::unconfigured(),
+    };
     let call_connection_service =
         ConnectionServiceImpl::new(entity_access_service.clone(), connection_gateway.clone());
     let call_repo = PgCallRepo::new(db.clone());
@@ -821,18 +865,19 @@ pub async fn run() -> anyhow::Result<()> {
         }
         None => None,
     };
-    let mut call_service_builder = CallServiceImpl::<_, _, _, _, _, _, AiCallSummarizer>::new(
-        call_repo,
-        livekit_rtc_client,
-        call_connection_service,
-        (*entity_access_service).clone(),
-        (*notification_ingress_service).clone(),
-        recording_storage,
-        config.livekit_server_url.as_ref(),
-    )
-    .with_summarizer(AiCallSummarizer::new(
-        ai_usage::pg_recorder_with_enforcement(db.clone(), config.enable_ai_usage_enforcement),
-    ));
+    let mut call_service_builder =
+        CallServiceImpl::<_, _, _, _, _, _, AiCallSummarizer>::new_optional(
+            call_repo,
+            livekit_rtc_client,
+            call_connection_service,
+            (*entity_access_service).clone(),
+            (*notification_ingress_service).clone(),
+            recording_storage,
+            config.livekit_server_url.as_ref().map(|url| url.as_ref()),
+        )
+        .with_summarizer(AiCallSummarizer::new(
+            ai_usage::pg_recorder_with_enforcement(db.clone(), config.enable_ai_usage_enforcement),
+        ));
     if let Some(secret) = internal_call_secret {
         call_service_builder = call_service_builder.with_internal_call_secret(secret);
     }
@@ -1189,35 +1234,38 @@ pub async fn run() -> anyhow::Result<()> {
     let sqs_client = Arc::new(sqs_client);
     let conn_gateway_client = Arc::new(conn_gateway_client);
 
-    // MacroConfig reads the shared OPENAI_API_KEY from Doppler's APP_SECRETS_JSON
-    // or the local environment. Validate once before constructing consumers.
-    let openai_api_key = config.openai_api_key.as_ref().to_owned();
-    anyhow::ensure!(
-        !openai_api_key.trim().is_empty(),
-        "OpenAI API key is required for task dedup embeddings and dictation",
-    );
-    let cohere_api_key = config.cohere_api_key.as_ref().to_owned();
-    anyhow::ensure!(
-        !cohere_api_key.trim().is_empty(),
-        "Cohere API key is required for task dedup reranking",
-    );
-    let dictation_state = dictation::inbound::axum_router::DictationRouterState::new(
-        dictation::domain::DictationServiceImpl::new(
-            dictation::outbound::WhisperTranscriber::new(&config.openai_api_key)?,
-            dictation::outbound::SymphoniaRecordingInspector,
-            ai_usage::pg_recorder_with_enforcement(db.clone(), config.enable_ai_usage_enforcement),
-        ),
-        RateLimitServiceImpl {
-            repo: RedisRateLimitAdapter {
-                redis: redis_client.clone(),
-            },
-        },
-        authorization_state.clone(),
-    );
-    let task_dedup_service = Arc::new(TaskDedupService::new(
-        TextEmbedding3Small::new(openai_api_key),
+    let dictation_state = config
+        .openai_api_key
+        .as_ref()
+        .map(|key| -> anyhow::Result<_> {
+            Ok(dictation::inbound::axum_router::DictationRouterState::new(
+                dictation::domain::DictationServiceImpl::new(
+                    dictation::outbound::WhisperTranscriber::new(key)?,
+                    dictation::outbound::SymphoniaRecordingInspector,
+                    ai_usage::pg_recorder_with_enforcement(
+                        db.clone(),
+                        config.enable_ai_usage_enforcement,
+                    ),
+                ),
+                RateLimitServiceImpl {
+                    repo: RedisRateLimitAdapter {
+                        redis: redis_client.clone(),
+                    },
+                },
+                authorization_state.clone(),
+            ))
+        })
+        .transpose()?;
+    let task_dedup_service = Arc::new(TaskDedupService::new_optional(
+        config
+            .openai_api_key
+            .as_ref()
+            .map(|key| TextEmbedding3Small::new(key.to_string())),
         PgTaskVectorDb::new(db.clone()),
-        CohereReranker::new(cohere_api_key),
+        config
+            .cohere_api_key
+            .as_ref()
+            .map(|key| CohereReranker::new(key.to_string())),
         Arc::new(AgentDuplicateJudge::new(
             ai_usage::pg_recorder_with_enforcement(db.clone(), config.enable_ai_usage_enforcement),
         )),
@@ -2292,7 +2340,7 @@ pub async fn run() -> anyhow::Result<()> {
             ),
         )),
         graphql_entity_mutation_service,
-        github_sync_service: Arc::new(github_sync_service_impl),
+        github_sync_service: github_sync_service_impl,
         github_pull_request_index_state,
         github_pull_request_state,
         github_pull_request_changes_state,

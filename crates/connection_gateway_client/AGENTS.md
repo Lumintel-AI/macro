@@ -47,3 +47,7 @@ connected users.
 ## Related
 
 - Rules: `.agents/rules/rust/architecture.md`, `.agents/rules/observability.md`
+
+## Document job updates
+
+`send_job_update` posts the unchanged result as `message_type = "job_update"` to the document entity. It uses the existing fleet-authenticated client, timeout and trace propagation. Non-success HTTP statuses fail delivery.

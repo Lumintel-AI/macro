@@ -101,3 +101,7 @@ wakes; interrupted quiet batches return to the next real prompt.
 ## Related
 
 - Rules: `.agents/rules/rust/architecture.md`, `.agents/rules/rust/security.md`
+
+## Unconfigured managed runtimes
+
+Use `HarnessContainers::Unconfigured` when managed-runtime credentials are absent. It refuses spawn, resume and resize; shutdown and teardown remain safe. External macrod attachments bypass managed provisioning.

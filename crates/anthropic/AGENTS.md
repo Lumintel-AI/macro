@@ -47,3 +47,7 @@ execution).
 ## Related
 
 - Rules: `.agents/rules/rust/architecture.md`
+
+## Optional server tools
+
+Use `Config::try_from_env` and `AnthropicToolContext::unconfigured` when Anthropic is optional. Server tools reject an absent client before admission or provider execution. The legacy required-key constructor retains its existing behavior.

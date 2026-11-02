@@ -23,7 +23,7 @@ pub struct UserDeletionAdapter<T: TeamService, O: OnboardingRepo> {
     documents: Arc<DocumentStorageServiceClient>,
     teams: Arc<T>,
     onboarding: O,
-    stripe: Arc<stripe::Client>,
+    stripe: Option<Arc<stripe::Client>>,
     client: reqwest::Client,
     internal_key: String,
     harness_url: String,
@@ -47,6 +47,32 @@ impl<T: TeamService, O: OnboardingRepo> UserDeletionAdapter<T, O> {
         teams: Arc<T>,
         onboarding: O,
         stripe: Arc<stripe::Client>,
+        internal_key: String,
+        harness_url: String,
+        scheduled_action_url: String,
+    ) -> Result<Self, Report> {
+        Ok(Self {
+            db,
+            documents,
+            teams,
+            onboarding,
+            stripe: Some(stripe),
+            client: reqwest::Client::builder()
+                .timeout(Duration::from_secs(300))
+                .redirect(reqwest::redirect::Policy::none())
+                .build()?,
+            internal_key,
+            harness_url,
+            scheduled_action_url,
+        })
+    }
+    /// Account deletion remains available without payment-provider credentials.
+    pub fn new_optional(
+        db: PgPool,
+        documents: Arc<DocumentStorageServiceClient>,
+        teams: Arc<T>,
+        onboarding: O,
+        stripe: Option<Arc<stripe::Client>>,
         internal_key: String,
         harness_url: String,
         scheduled_action_url: String,
@@ -187,7 +213,10 @@ impl<T: TeamService, O: OnboardingRepo> UserDeletionGateway for UserDeletionAdap
             }
         };
 
-        stripe::Customer::delete(&self.stripe, &customer_id)
+        let stripe = self.stripe.as_ref().ok_or_else(|| {
+            rootcause::report!("Stripe is unavailable: cannot delete an existing Stripe customer")
+        })?;
+        stripe::Customer::delete(stripe, &customer_id)
             .await
             .map(|_| {
                 tracing::info!(stripe_customer_id = %customer_id, "deleted stripe customer");

@@ -168,3 +168,7 @@ the gateway `/email` prefix.
 Startup validates the scheduled delivery Message-ID domain through
 `email_db_client`. `SENDER_BASE_ADDRESS` changes new IDs to `send.<domain>`;
 the default remains `send.macro.com` and retries keep persisted IDs.
+
+## Optional enrichment
+
+`APOLLO_API_KEY` is an optional resolved secret. The pubsub worker uses its existing unfurl enrichment when Apollo is absent or disabled.

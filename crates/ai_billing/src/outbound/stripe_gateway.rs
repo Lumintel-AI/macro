@@ -627,3 +627,53 @@ impl PaymentGateway for NoOpPaymentGateway {
         Ok(None)
     }
 }
+
+impl PaymentGateway for Option<StripePaymentGateway> {
+    async fn create_credit_checkout(&self, request: CreditCheckoutRequest) -> Result<String> {
+        match self {
+            Some(gateway) => gateway.create_credit_checkout(request).await,
+            None => NoOpPaymentGateway.create_credit_checkout(request).await,
+        }
+    }
+    async fn open_overage_invoice(&self, request: OverageChargeRequest) -> Result<String> {
+        match self {
+            Some(gateway) => gateway.open_overage_invoice(request).await,
+            None => NoOpPaymentGateway.open_overage_invoice(request).await,
+        }
+    }
+    async fn open_credit_reload_invoice(&self, request: CreditReloadRequest) -> Result<String> {
+        match self {
+            Some(gateway) => gateway.open_credit_reload_invoice(request).await,
+            None => NoOpPaymentGateway.open_credit_reload_invoice(request).await,
+        }
+    }
+    async fn pay_overage_invoice(
+        &self,
+        id: Uuid,
+        invoice: &str,
+        scope: SubscriptionScope,
+    ) -> Result<bool> {
+        match self {
+            Some(gateway) => gateway.pay_overage_invoice(id, invoice, scope).await,
+            None => {
+                NoOpPaymentGateway
+                    .pay_overage_invoice(id, invoice, scope)
+                    .await
+            }
+        }
+    }
+    async fn subscription_period(
+        &self,
+        customer: &str,
+        scope: SubscriptionScope,
+    ) -> Result<Option<BillingPeriod>> {
+        match self {
+            Some(gateway) => gateway.subscription_period(customer, scope).await,
+            None => {
+                NoOpPaymentGateway
+                    .subscription_period(customer, scope)
+                    .await
+            }
+        }
+    }
+}

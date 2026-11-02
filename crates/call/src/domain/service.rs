@@ -84,7 +84,7 @@ pub struct CallServiceImpl<
     entity_access_service: E,
     notification_ingress: Arc<N>,
     recording_storage: S,
-    server_url: String,
+    server_url: Option<String>,
     egress_s3_config: Option<EgressS3Config>,
     internal_call_secret: Option<String>,
     summarizer: Option<Sm>,
@@ -121,7 +121,49 @@ impl<
             entity_access_service,
             notification_ingress: Arc::new(notification_ingress),
             recording_storage,
-            server_url: server_url.into(),
+            server_url: Some(server_url.into()),
+            egress_s3_config: None,
+            internal_call_secret: None,
+            summarizer: None,
+            voip_push_sender: Arc::new(()),
+            voice_repo: NoOpVoiceRepository,
+            ring_status_base_url: None,
+            event_broker: NoopMacroEventBroker,
+        }
+    }
+}
+
+impl<
+    R: CallRepository,
+    C: CallRtcClient,
+    Cn: ConnectionService,
+    E: EntityAccessService,
+    N: NotificationIngress,
+    S: RecordingStorage,
+    Sm: CallSummarizer,
+    V: VoipPushSender,
+    Vr: VoiceRepository,
+    B: MacroEventBroker,
+> CallServiceImpl<R, C, Cn, E, N, S, Sm, V, Vr, B>
+{
+    /// Build calls with an optional RTC origin.
+    pub fn new_optional(
+        repo: R,
+        rtc_client: C,
+        connection_service: Cn,
+        entity_access_service: E,
+        notification_ingress: N,
+        recording_storage: S,
+        server_url: Option<&str>,
+    ) -> Self {
+        Self {
+            repo,
+            rtc_client: Arc::new(rtc_client),
+            connection_service: Arc::new(connection_service),
+            entity_access_service,
+            notification_ingress: Arc::new(notification_ingress),
+            recording_storage,
+            server_url: server_url.map(str::to_owned),
             egress_s3_config: None,
             internal_call_secret: None,
             summarizer: None,
@@ -903,7 +945,11 @@ impl<
                             entity_access_service: self.entity_access_service.clone(),
                             notification_ingress: self.notification_ingress.clone(),
                             voip_push_sender: self.voip_push_sender.clone(),
-                            server_url: self.server_url.clone(),
+                            server_url: self.server_url.clone().ok_or_else(|| {
+                                CallError::Internal(anyhow::anyhow!(
+                                    "LiveKit is unavailable: integration is not configured"
+                                ))
+                            })?,
                             ring_status_base_url: self.ring_status_base_url.clone(),
                             egress_s3_config: self.egress_s3_config.clone(),
                         }
@@ -977,7 +1023,11 @@ impl<
             share_token: None,
             token,
             room_name: call.room_name,
-            server_url: self.server_url.clone(),
+            server_url: self.server_url.clone().ok_or_else(|| {
+                CallError::Internal(anyhow::anyhow!(
+                    "LiveKit is unavailable: integration is not configured"
+                ))
+            })?,
         })
     }
 

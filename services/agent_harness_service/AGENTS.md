@@ -157,3 +157,7 @@ listener failure shuts down the process so ECS can replace the task.
 ## Related
 
 - Rules: `.agents/rules/rust/architecture.md`, `.agents/rules/config-and-service-urls.md`
+
+## Optional integrations
+
+Model API keys, Daytona credentials, GitHub App credentials and Pipedream credentials are optional. Managed sandbox provisioning stays unavailable without its credentials; external macrod sessions and built-in/custom MCP keep working. See `docs/development/optional-integrations.md`.

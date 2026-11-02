@@ -4,7 +4,7 @@ use entity_registry::NonUserOwners;
 use macro_auth::InternalApiKey;
 pub use macro_env::Environment;
 use macro_env_var::{env_vars, maybe_env_vars};
-use secretsmanager_client::LocalOrRemoteSecret;
+use secretsmanager_client::{LocalOrRemoteSecret, OptionalLocalOrRemoteSecret};
 
 pub const DEFAULT_PRESIGNED_URL_EXPIRY_SECONDS: u64 = 900; // 15 minutes
 /// Allow long recordings to play and seek without the signed URL expiring mid-session.
@@ -40,8 +40,7 @@ env_vars! {
     pub struct LivekitServerUrl;
     pub struct LivekitApiKey;
     pub struct LivekitApiSecret;
-    /// Cohere API key used by the task-dedup reranker. Required — injected
-    /// as `COHERE_API_KEY`, following the same pattern as `OPENAI_API_KEY`.
+    /// Cohere credential, optional when task duplicate detection is disabled.
     pub struct CohereApiKey;
     pub struct DocumentLimit;
     /// Signed URL lifetime for document content.
@@ -125,23 +124,23 @@ pub struct Config {
     pub opensearch_url: OpensearchUrl,
     pub opensearch_username: OpensearchUsername,
     pub opensearch_password: OpensearchPassword,
-    pub github_sync_app_url: GithubSyncAppUrl,
-    pub github_sync_app_client_id: GithubSyncAppClientId,
-    pub github_installation_state_secret: GithubInstallationStateSecret,
-    pub github_sync_app_client_secret: GithubSyncAppClientSecret,
+    pub github_sync_app_url: Option<GithubSyncAppUrl>,
+    pub github_sync_app_client_id: Option<GithubSyncAppClientId>,
+    pub github_installation_state_secret: Option<GithubInstallationStateSecret>,
+    pub github_sync_app_client_secret: Option<GithubSyncAppClientSecret>,
     pub kafka_brokers: KafkaBrokers,
-    pub livekit_server_url: LivekitServerUrl,
-    pub livekit_api_key: LivekitApiKey,
-    pub livekit_api_secret: LivekitApiSecret,
+    pub livekit_server_url: Option<LivekitServerUrl>,
+    pub livekit_api_key: Option<LivekitApiKey>,
+    pub livekit_api_secret: Option<LivekitApiSecret>,
     /// Shared server credential for task embeddings and Whisper, supplied by Doppler.
-    pub openai_api_key: OpenaiApiKey,
-    pub cohere_api_key: CohereApiKey,
-    pub github_webhook_secret_key: LocalOrRemoteSecret<GithubWebhookSecretKey>,
-    pub github_sync_app_pem_secret_key: LocalOrRemoteSecret<GithubSyncAppPemSecretKey>,
-    pub cal_webhook_secret_key: CalWebhookSecretKey,
-    pub cal_event_type_content_names_key: CalEventTypeContentNamesKey,
-    pub meta_pixel_id: MetaPixelId,
-    pub meta_access_token: MetaAccessToken,
+    pub openai_api_key: Option<OpenaiApiKey>,
+    pub cohere_api_key: Option<CohereApiKey>,
+    pub github_webhook_secret_key: OptionalLocalOrRemoteSecret<GithubWebhookSecretKey>,
+    pub github_sync_app_pem_secret_key: OptionalLocalOrRemoteSecret<GithubSyncAppPemSecretKey>,
+    pub cal_webhook_secret_key: Option<CalWebhookSecretKey>,
+    pub cal_event_type_content_names_key: Option<CalEventTypeContentNamesKey>,
+    pub meta_pixel_id: Option<MetaPixelId>,
+    pub meta_access_token: Option<MetaAccessToken>,
     pub document_storage_service_auth_key: DocumentStorageServiceAuthKey,
     /// The internal api key
     pub internal_api_key: InternalApiKey,

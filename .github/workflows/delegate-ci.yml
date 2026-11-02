@@ -140,3 +140,31 @@ jobs:
         run: |
           echo "Package \`$PACKAGE\` finished with $RESULT." >> "$GITHUB_STEP_SUMMARY"
           df -h /
+
+  dependency-artifacts:
+    name: Check dependency artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+      - name: Install the repository toolchain
+        run: |
+          toolchain=$(python3 -c 'import tomllib; print(tomllib.load(open("rust-toolchain.toml", "rb"))["toolchain"]["channel"])')
+          rustup toolchain install "$toolchain" --profile minimal
+          echo "RUSTUP_TOOLCHAIN=$toolchain" >> "$GITHUB_ENV"
+      - name: Generate and verify dependency artifacts
+        run: |
+          cargo run --locked -p xtask_deps
+          cargo run --locked -p xtask_deps -- --check
+          git diff --exit-code -- Cargo.lock crates/workspace-hack/Cargo.toml .github/workspace-dep-closures.json
+      - name: Save generated dependency artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dependency-artifacts
+          path: |
+            Cargo.lock
+            crates/workspace-hack/Cargo.toml
+            .github/workspace-dep-closures.json

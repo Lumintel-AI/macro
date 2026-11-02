@@ -32,7 +32,7 @@ mod test;
 /// Resolves MCP slugs against an owner's Pipedream connections.
 pub struct PipedreamMcpCredentials<Connections, Upstream> {
     connections: Arc<Connections>,
-    upstream: Upstream,
+    upstream: Option<Upstream>,
 }
 
 impl<Connections, Upstream> PipedreamMcpCredentials<Connections, Upstream>
@@ -43,6 +43,14 @@ where
     /// Build the adapter over the store holding the owner's connections and
     /// the client that addresses Pipedream's MCP server.
     pub fn new(connections: Arc<Connections>, upstream: Upstream) -> Self {
+        Self {
+            connections,
+            upstream: Some(upstream),
+        }
+    }
+
+    /// Keep custom and built-in MCP available without Pipedream credentials.
+    pub fn new_optional(connections: Arc<Connections>, upstream: Option<Upstream>) -> Self {
         Self {
             connections,
             upstream,
@@ -123,7 +131,12 @@ where
         // refresh token to fail on. If the account behind this connection has
         // gone unhealthy, Pipedream answers the forwarded call with its own
         // error and the status passes through to the agent.
-        let call = self.upstream.upstream(&record).await.map_err(|error| {
+        let upstream = self.upstream.as_ref().ok_or_else(|| {
+            EgressError::Upstream(rootcause::report!(
+                "Pipedream is unavailable: integration is not configured"
+            ))
+        })?;
+        let call = upstream.upstream(&record).await.map_err(|error| {
             EgressError::Upstream(rootcause::report!(
                 "could not address Pipedream for {slug}: {error:?}"
             ))

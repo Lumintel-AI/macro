@@ -62,3 +62,7 @@ in-call chat.
 ## Related
 
 - Rules: `.agents/rules/rust/architecture.md`, `.agents/rules/rust/db.md`
+
+## Optional LiveKit
+
+`LivekitRtcClient::unconfigured` creates no provider clients and rejects RTC operations. `CallServiceImpl::new_optional` accepts an absent RTC origin. Persisted call records remain usable; token responses require a configured origin.

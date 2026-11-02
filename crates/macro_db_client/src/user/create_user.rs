@@ -7,8 +7,7 @@ mod test;
 
 /// Creates a new user in the database and attaches provided roles
 ///
-/// `macro_user_customer_id` supplies the required legacy account key. Only an
-/// actual Stripe customer belongs in the optional profile billing field.
+/// Both account and profile billing fields are absent without a Stripe customer.
 #[expect(clippy::too_many_arguments, reason = "too annoying to fix")]
 #[tracing::instrument(skip(db))]
 pub async fn create_user(
@@ -17,7 +16,7 @@ pub async fn create_user(
     username: &str,
     email: &str,
     is_verified: bool,
-    macro_user_customer_id: &str,
+    macro_user_customer_id: Option<&str>,
     stripe_customer_id: Option<&str>,
     organization_id: Option<i32>,
     roles: HashSet<String>,

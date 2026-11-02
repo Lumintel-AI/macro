@@ -2,7 +2,7 @@ use anyhow::Context;
 use macro_auth::InternalApiKey;
 pub use macro_env::Environment;
 use macro_env_var::env_vars;
-use secretsmanager_client::LocalOrRemoteSecret;
+use secretsmanager_client::{LocalOrRemoteSecret, OptionalLocalOrRemoteSecret};
 
 env_vars! {
     pub struct EmailServiceCloudfrontSignerPrivateKey;
@@ -73,7 +73,7 @@ pub struct Config {
     /// Apollo.io API key for CRM enrichment. Locally this is the key
     /// itself; in deployed envs it's the name of the Secrets Manager
     /// secret holding it (resolved at startup). Empty disables enrichment.
-    pub apollo_api_key: LocalOrRemoteSecret<ApolloApiKey>,
+    pub apollo_api_key: OptionalLocalOrRemoteSecret<ApolloApiKey>,
 
     /// The queue max messages per poll
     #[macro_config_default(10)]

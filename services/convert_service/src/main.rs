@@ -110,7 +110,9 @@ async fn main() -> anyhow::Result<()> {
         let s3_client = s3_client.clone();
         let lambda_client = lambda_client::Lambda::new(aws_sdk_lambda::Client::new(&aws_config));
 
-        tokio::spawn(async move { run_worker(sqs_worker, s3_client, lambda_client).await });
+        let job_updates =
+            lambda_client::job_update::JobUpdateConfig::from_env()?.sender(&lambda_client);
+        tokio::spawn(async move { run_worker(sqs_worker, s3_client, job_updates).await });
     }
 
     api::setup_and_serve(ApiContext {

@@ -38,7 +38,7 @@ use macro_authorization::{
 };
 use macro_cache_client::MacroCache;
 use macro_env::Environment;
-use macro_env_var::env_var;
+use macro_env_var::{env_var, maybe_env_var};
 use macro_event_broker::{KafkaEventPublisher, MacroEventBrokerService};
 use native_app_service::{domain::service::NativeAppServiceImpl, outbound::DefaultBundleFetcher};
 use notification::outbound::queue::SqsQueue;
@@ -92,7 +92,7 @@ pub(crate) type AiBillingServiceType = ai_billing::domain::BillingServiceImpl<
     >,
     ai_billing::outbound::PgUsageReader,
     ai_billing::outbound::PgBillingRepo,
-    ai_billing::outbound::StripePaymentGateway,
+    Option<ai_billing::outbound::StripePaymentGateway>,
 >;
 
 pub(crate) type SubscriptionStatusServiceType =
@@ -189,7 +189,7 @@ pub(crate) struct ApiContext {
     /// Owner-bound Codex OAuth lifecycle and cloud target settings.
     pub codex_connection: Option<Arc<dyn codex_connection::domain::ConnectionService>>,
     pub macro_cache_client: Arc<MacroCache>,
-    pub stripe_client: Arc<stripe::Client>,
+    pub stripe_client: Option<Arc<stripe::Client>>,
     pub subscription_status: Arc<SubscriptionStatusServiceType>,
     pub subscription_plan: Arc<
         crate::service::subscription_plan::PlanService<
@@ -221,7 +221,7 @@ pub(crate) struct ApiContext {
     pub authorization_state: MacroAuthorizationState<AuthorizationService>,
     pub token_context: MacroApiTokenContext,
     pub internal_api_key: InternalApiKey,
-    pub stripe_webhook_secret: LocalOrRemoteSecret<StripeWebhookSecretKey>,
+    pub stripe_webhook_secret: Option<LocalOrRemoteSecret<StripeWebhookSecretKey>>,
     pub user_roles_and_permissions_service:
         Arc<UserRolesAndPermissionsServiceImpl<MacroDB, MacroDB>>, // Note: since FromRef doesn't support generics we have to specify the concrete types here
     pub teams_service: Arc<TeamsServiceType>,
@@ -237,10 +237,10 @@ pub(crate) struct ApiContext {
     pub user_language_service: Arc<UserLanguageServiceType>,
     pub rate_limit_service: RateLimiter,
     /// The stripe price ids for each paid plan's seat
-    pub stripe_prices: crate::api::user::stripe::StripePrices,
+    pub stripe_prices: Option<crate::api::user::stripe::StripePrices>,
     /// AI allowances, credits, and overage
     pub ai_billing_service: Arc<AiBillingServiceType>,
-    pub ai_payment_gateway: Arc<ai_billing::outbound::StripePaymentGateway>,
+    pub ai_payment_gateway: Arc<Option<ai_billing::outbound::StripePaymentGateway>>,
     /// Whether Gmail link consent requests the Google Calendar scope.
     pub calendar_scope_enabled: bool,
     #[from_ref(skip)]
@@ -251,7 +251,7 @@ pub(crate) struct ApiContext {
     pub account_link_state_key: AccountLinkStateKey,
 }
 
-env_var! {
+maybe_env_var! {
     #[derive(Clone)]
     pub struct StripeWebhookSecretKey;
 }
@@ -286,4 +286,26 @@ pub struct TokenContext {
     pub access_token: String,
     /// The refresh token
     pub refresh_token: String,
+}
+
+impl ApiContext {
+    pub(crate) fn require_stripe(
+        &self,
+    ) -> Result<(), crate::api::user::stripe::StripeOperationError> {
+        if self.stripe_client.is_none() || self.stripe_prices.is_none() {
+            return Err(crate::api::user::stripe::StripeOperationError::Unavailable);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn stripe_client(&self) -> anyhow::Result<&stripe::Client> {
+        self.stripe_client
+            .as_deref()
+            .ok_or_else(|| anyhow::anyhow!("Stripe is unavailable: integration is not configured"))
+    }
+    pub(crate) fn stripe_prices(&self) -> anyhow::Result<&crate::api::user::stripe::StripePrices> {
+        self.stripe_prices.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("Stripe prices are unavailable: integration is not configured")
+        })
+    }
 }

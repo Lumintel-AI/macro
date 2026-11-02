@@ -907,15 +907,15 @@ pub(crate) type DssDictationState = dictation::inbound::axum_router::DictationRo
 
 #[derive(Clone, FromRef)]
 pub(crate) struct ApiContext {
-    pub dictation_state: DssDictationState,
+    pub dictation_state: Option<DssDictationState>,
     pub db: PgPool,
     pub readonly_db: ReadOnlyPool,
     pub redis_client: Arc<Redis>,
     pub s3_client: Arc<S3>,
-    pub github_sync_service: Arc<GithubSyncServiceType>,
-    pub github_pull_request_index_state: DssGithubPullRequestIndexState,
+    pub github_sync_service: Option<Arc<GithubSyncServiceType>>,
+    pub github_pull_request_index_state: Option<DssGithubPullRequestIndexState>,
     pub github_pull_request_state: DssGithubPullRequestState,
-    pub github_pull_request_changes_state: DssGithubPullRequestChangesState,
+    pub github_pull_request_changes_state: Option<DssGithubPullRequestChangesState>,
     pub dynamodb_client: Arc<DynamodbClient>,
     pub dynamo_db: aws_sdk_dynamodb::Client,
     pub soup_router_state: DssSoupState,
@@ -993,7 +993,7 @@ pub(crate) struct ApiContext {
     pub webhook_state: DssWebhookState,
     pub sse_stream_state: DssSseStreamState,
     pub call_internal_state: DssCallInternalState,
-    pub cal_webhook_state: DssCalWebhookState,
+    pub cal_webhook_state: Option<DssCalWebhookState>,
     pub entity_access_management_service: EntityAccessManagementService,
     pub crm_state: DssCrmState,
     pub owned_purge_state: DssOwnedPurgeState,

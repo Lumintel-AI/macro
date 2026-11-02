@@ -47,15 +47,13 @@ pub async fn handler(ctx: Context, event: LambdaEvent<S3Event>) -> Result<(), Er
 
                 let result = service::document::handle_docx_unzip_failure(
                     ctx.db.clone(),
-                    ctx.lambda_client.clone(),
-                    ctx.config.web_socket_response_lambda.as_str(),
+                    &ctx.config.job_updates.sender(ctx.lambda_client.as_ref()),
                     document_key_parts.document_id.as_str(),
                 )
                 .await;
 
-                if let Err(err) = result {
-                    tracing::error!(error=?err, "error handling docx unzip notification");
-                }
+                result?;
+                return Err(err.into());
             }
         }
     }

@@ -663,3 +663,16 @@ fn deserialize_text_with_citations() {
         Ok(block) => assert!(matches!(block, ResponseContentKind::Text(_))),
     }
 }
+
+#[tokio::test]
+async fn unconfigured_server_tool_returns_an_error_without_a_provider_client() {
+    use ai_toolset::{AsyncTool, ServiceContext};
+    let context = AnthropicToolContext::unconfigured();
+    let request = RequestContext::new("macro|user@example.com".to_owned().try_into().unwrap());
+    let result = WebSearch {
+        input: "test".into(),
+    }
+    .call(ServiceContext(context), request)
+    .await;
+    assert!(result.is_err());
+}

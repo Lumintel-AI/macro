@@ -96,3 +96,7 @@ project, parent and label writes pass through the owning property services.
 
 Hosted booking links use `AppServiceUrl` and `OVERRIDE_APP_SERVICE_URL`. Local
 booking contexts keep their empty public origin.
+
+## Optional Anthropic tools
+
+`build_anthropic_tool_context` returns `Result` and leaves server tools unconfigured when `ANTHROPIC_API_KEY` is absent. Workspace tools and external-session contexts still compose.

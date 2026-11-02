@@ -99,6 +99,11 @@ pub struct JudgeResult {
 /// Errors produced by task duplicate detection.
 #[derive(Debug, thiserror::Error)]
 pub enum TaskDedupError {
+    /// Detection needs configured embedding and reranking providers.
+    #[error(
+        "task duplicate detection is unavailable: OPENAI_API_KEY and COHERE_API_KEY are required"
+    )]
+    Unavailable,
     /// A referenced duplicate match was not found.
     #[error("duplicate match not found")]
     MatchNotFound,

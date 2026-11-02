@@ -9,7 +9,7 @@ use anyhow::Context;
 use model::convert::ConvertQueueMessage;
 
 use crate::{
-    config::{LOK_PATH, WEB_SOCKET_RESPONSE_LAMBDA},
+    config::LOK_PATH,
     model::{BomPart, DocxUploadJobData, DocxUploadJobResult, DocxUploadJobSuccessDataInner},
     utils::{
         cleanup_folder, conversion_timeout, get_lok_filter_from_file_types, resolve_file_type,
@@ -26,7 +26,7 @@ pub(super) fn is_docx_key(key: &str) -> bool {
 pub async fn process_message(
     worker: &sqs_worker::SQSWorker,
     s3_client: &s3_client::S3,
-    lambda_client: &lambda_client::Lambda,
+    lambda_client: &impl lambda_client::job_update::JobUpdateSender,
     message: &aws_sdk_sqs::types::Message,
 ) -> anyhow::Result<()> {
     tracing::info!("processing message");
@@ -76,8 +76,10 @@ pub async fn process_message(
             if is_docx_key(&req.from_key) {
                 tracing::trace!("sending success message to lambda");
                 lambda_client
-                    .invoke_event(
-                        &WEB_SOCKET_RESPONSE_LAMBDA,
+                    .send(
+                        s3_key::DocumentKey::parse(&req.to_key)?
+                            .document_id()
+                            .context("conversion destination must identify a document")?,
                         &DocxUploadJobResult {
                             job_id: Cow::Borrowed(&job_id),
                             status: "Completed".into(),
@@ -104,8 +106,10 @@ pub async fn process_message(
             if is_docx_key(&req.from_key) {
                 tracing::trace!("sending failure message to lambda");
                 lambda_client
-                    .invoke_event(
-                        &WEB_SOCKET_RESPONSE_LAMBDA,
+                    .send(
+                        s3_key::DocumentKey::parse(&req.to_key)?
+                            .document_id()
+                            .context("conversion destination must identify a document")?,
                         &DocxUploadJobResult {
                             job_id: Cow::Borrowed(&job_id),
                             status: "Failed".into(),

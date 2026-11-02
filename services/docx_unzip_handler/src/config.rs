@@ -5,7 +5,6 @@ env_vars! {
     pub struct DatabaseUrl;
     pub struct RedisUri;
     pub struct DocumentStorageBucket;
-    pub struct WebSocketResponseLambda;
 }
 
 /// The configuration parameters for the application.
@@ -26,8 +25,8 @@ pub struct Config {
     /// The document storage s3 bucket
     pub document_storage_bucket: String,
 
-    /// The name of the lambda function that will be used to send the response to the websocket
-    pub web_socket_response_lambda: String,
+    /// Configured document-job callback transport.
+    pub job_updates: lambda_client::job_update::JobUpdateConfig,
 }
 
 impl Config {
@@ -41,14 +40,12 @@ impl Config {
         let document_storage_bucket = DocumentStorageBucket::new()
             .context("DOCUMENT_STORAGE_BUCKET must be provided")?
             .to_string();
-        let web_socket_response_lambda = WebSocketResponseLambda::new()
-            .context("WEB_SOCKET_RESPONSE_LAMBDA must be provided")?
-            .to_string();
+        let job_updates = lambda_client::job_update::JobUpdateConfig::from_env()?;
         Ok(Config {
             database_url,
             redis_uri,
             document_storage_bucket,
-            web_socket_response_lambda,
+            job_updates,
         })
     }
 }

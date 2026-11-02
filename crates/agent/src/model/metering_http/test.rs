@@ -659,7 +659,7 @@ async fn routing_fallback_is_attributed_to_actual_provider_and_wire_model() {
         .build()
         .unwrap();
     let router = ModelRouter::new(anthropic, openai);
-    let routed = router.route_or_default("unknown/model");
+    let routed = router.route_or_default("unknown/model").unwrap();
     let model = routed.model_name().to_owned();
     let RoutedModel::Anthropic(routed) = routed else {
         panic!("expected native fallback")

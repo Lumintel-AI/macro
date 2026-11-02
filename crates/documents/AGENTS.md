@@ -103,3 +103,7 @@ word docs, Illustrator/Photoshop files).
 
 - Rules: `.agents/rules/rust/architecture.md`, `.agents/rules/rust/db.md` ·
   Skill: `collab-surface-core`
+
+## Optional duplicate detection
+
+Missing model providers return `DocumentError::Unavailable` as HTTP 503. Task creation skips background duplicate detection while it is unavailable. Stored duplicate matches remain readable and dismissible.

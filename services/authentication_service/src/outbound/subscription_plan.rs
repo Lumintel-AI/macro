@@ -15,13 +15,38 @@ use teams::domain::{
 #[derive(Clone)]
 pub struct StripePlanGateway<C> {
     db: PgPool,
-    stripe: Arc<stripe::Client>,
-    prices: SeatPrices,
+    stripe: Option<Arc<stripe::Client>>,
+    prices: Option<SeatPrices>,
     customer: C,
 }
 impl<C> StripePlanGateway<C> {
     /// Inject customer storage, provider client and billing domain capabilities.
+    fn stripe(&self) -> Result<&stripe::Client, PlanChangeError> {
+        self.stripe.as_deref().ok_or_else(|| {
+            anyhow::anyhow!("Stripe is unavailable: integration is not configured").into()
+        })
+    }
+    fn prices(&self) -> Result<&SeatPrices, PlanChangeError> {
+        self.prices.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("Stripe is unavailable: integration is not configured").into()
+        })
+    }
+
     pub fn new(db: PgPool, stripe: Arc<stripe::Client>, prices: SeatPrices, customer: C) -> Self {
+        Self {
+            db,
+            stripe: Some(stripe),
+            prices: Some(prices),
+            customer,
+        }
+    }
+    /// Build billing capabilities with optional provider configuration.
+    pub fn new_optional(
+        db: PgPool,
+        stripe: Option<Arc<stripe::Client>>,
+        prices: Option<SeatPrices>,
+        customer: C,
+    ) -> Self {
         Self {
             db,
             stripe,
@@ -40,7 +65,7 @@ impl<C> StripePlanGateway<C> {
         params.limit = Some(100);
         let mut found = None;
         loop {
-            let page = stripe::Subscription::list(&self.stripe, &params)
+            let page = stripe::Subscription::list(self.stripe()?, &params)
                 .await
                 .map_err(anyhow::Error::from)?;
             let last = page.data.last().map(|s| s.id.clone());
@@ -93,7 +118,7 @@ impl<C: CustomerRepository> PlanGateway for StripePlanGateway<C> {
                 let plan = item
                     .price
                     .as_ref()
-                    .and_then(|p| self.prices.plan_for_price(p.id.as_str()))?;
+                    .and_then(|p| self.prices.as_ref()?.plan_for_price(p.id.as_str()))?;
                 Some((plan, item.quantity.unwrap_or(1)))
             })
             .collect::<Vec<_>>();
@@ -115,7 +140,7 @@ impl<C: CustomerRepository> PlanGateway for StripePlanGateway<C> {
         target: SeatPlan,
         action: PlanAction,
     ) -> Result<(), PlanChangeError> {
-        self.prices
+        self.prices()?
             .price_id(target)
             .map_err(|_| PlanChangeError::PlanUnavailable)?;
         let id = subscription.id.parse().map_err(anyhow::Error::from)?;

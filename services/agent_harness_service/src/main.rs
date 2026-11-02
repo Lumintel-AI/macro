@@ -123,9 +123,7 @@ use cursor_api_key::cipher::{AwsKmsCiphertexts, KmsCursorApiKeyCipher};
 use cursor_cloud_agents::api::cursor_api_base_url;
 use entity_registry::OwnerGrantPolicy;
 use entity_registry_db_utils::OwnedEntityRegistrar;
-use github::domain::service::{
-    InstallationTokenConfig, InstallationTokenService, ReachableRepositoriesService,
-};
+use github::domain::service::{InstallationTokenService, ReachableRepositoriesService};
 use github::outbound::github_sync_client::GithubSyncClientImpl;
 use github::outbound::pg_github_sync_repo::PgGithubSyncRepo;
 use github::outbound::pull_request_diff::GithubPullRequestDiffClient;
@@ -411,12 +409,11 @@ async fn run() -> anyhow::Result<()> {
     // runtime has no model provider at all (`container/opencode.json` enables
     // only `anthropic`), so managed sessions would advertise no models and
     // fail every prompt.
-    if config.anthropic_api_key.trim().is_empty() {
+    if config.anthropic_api_key.is_none() {
         tracing::warn!(
             "ANTHROPIC_API_KEY is unset: managed sandboxes have no model provider; external agent sessions are unaffected"
         );
     }
-    let anthropic_api_key = AnthropicApiKeySecret::new(config.anthropic_api_key.clone());
     let sandbox = if config.dev_dangerous_local_containers {
         if !matches!(config.environment, Environment::Local) {
             anyhow::bail!("DEV_DANGEROUS_LOCAL_CONTAINERS is only allowed when ENVIRONMENT=local");
@@ -427,30 +424,30 @@ async fn run() -> anyhow::Result<()> {
                 "LOCAL_CONTAINER_NETWORK is required when DEV_DANGEROUS_LOCAL_CONTAINERS is set"
             );
         }
+        let key = config
+            .anthropic_api_key
+            .as_ref()
+            .context("ANTHROPIC_API_KEY is required for managed local containers")?;
         HarnessContainers::Local(LocalContainerManager::new(LocalSettings {
             docker_binary: config.local_container_docker_binary.clone(),
             image: config.local_container_image.clone(),
             network: network.to_owned(),
-            anthropic_api_key: anthropic_api_key.clone(),
+            anthropic_api_key: AnthropicApiKeySecret::new(key.clone()),
         }))
-    } else {
-        // Credential-less boot is deliberate: external sessions need no
-        // sandbox at all. A Daytona spawn without a key fails at spawn time
-        // instead, loudly.
-        if config.daytona_api_key.trim().is_empty() {
-            tracing::warn!(
-                "DAYTONA_API_KEY is unset: Daytona-backed sandboxes are unarmed; external agent sessions are unaffected"
-            );
-        }
+    } else if let (Some(key), Some(anthropic)) =
+        (&config.daytona_api_key, &config.anthropic_api_key)
+    {
         HarnessContainers::Daytona(DaytonaContainerManager::new(
             DaytonaSettings {
                 api_url: config.daytona_api_url.clone(),
-                api_key: DaytonaApiKeySecret::new(config.daytona_api_key.clone()),
+                api_key: DaytonaApiKeySecret::new(key.clone()),
                 snapshot: Snapshot::new(config.daytona_snapshot.clone()),
-                anthropic_api_key,
+                anthropic_api_key: AnthropicApiKeySecret::new(anthropic.clone()),
             },
             pending_commands.clone(),
         ))
+    } else {
+        HarnessContainers::Unconfigured
     };
     let container_shutdown = sandbox.clone();
 
@@ -474,18 +471,28 @@ async fn run() -> anyhow::Result<()> {
 
     // The client that addresses Pipedream's remote MCP server, built from the
     // same credentials `agent_harness_service::cognition` uses.
-    let pipedream = PipedreamClient::new(PipedreamConfig {
-        client_id: config.pipedream_client_id.to_string(),
-        client_secret: config.pipedream_client_secret.to_string(),
-        project_id: config.pipedream_project_id.to_string(),
-        environment: config.pipedream_environment.clone(),
-        api_url: config.pipedream_api_url.clone(),
-        mcp_url: config.pipedream_mcp_url.clone(),
-        // Only Connect tokens carry allowed origins, and this service never
-        // mints one: connecting apps stays in the app.
-        allowed_origins: Vec::new(),
-    })
-    .context("failed to build Pipedream client")?;
+    let pipedream = match (
+        config.pipedream_client_id.as_ref(),
+        config.pipedream_client_secret.as_ref(),
+        config.pipedream_project_id.as_ref(),
+    ) {
+        (Some(client_id), Some(client_secret), Some(project_id)) => {
+            let client = PipedreamClient::new(PipedreamConfig {
+                client_id: client_id.to_string(),
+                client_secret: client_secret.to_string(),
+                project_id: project_id.to_string(),
+                environment: config.pipedream_environment.clone(),
+                api_url: config.pipedream_api_url.clone(),
+                mcp_url: config.pipedream_mcp_url.clone(),
+                // Only Connect tokens carry allowed origins, and this service never
+                // mints one: connecting apps stays in the app.
+                allowed_origins: Vec::new(),
+            })
+            .context("failed to build Pipedream client")?;
+            Some(client)
+        }
+        _ => None,
+    };
 
     // Every session's MCP servers: Macro's own under the reserved `macro`
     // slug, the owner's custom servers by URL key, then the owner's Pipedream
@@ -494,7 +501,7 @@ async fn run() -> anyhow::Result<()> {
     // single-user and minutes from expiry.
     let mcp_credentials = WithMacroMcp::new(
         WithCustomMcp::new(
-            PipedreamMcpCredentials::new(Arc::clone(&mcp_connections), pipedream),
+            PipedreamMcpCredentials::new_optional(Arc::clone(&mcp_connections), pipedream),
             Arc::clone(&mcp_servers),
         ),
         MacroApiTokenSigner::new(
@@ -537,10 +544,7 @@ async fn run() -> anyhow::Result<()> {
             )),
             mcp_credentials,
             GithubAppTokens::new(InstallationTokenService::new(
-                InstallationTokenConfig {
-                    client_id: config.github_sync_app_client_id.clone(),
-                    private_key_pem: config.github_sync_app_pem_secret_key.as_ref().to_owned(),
-                },
+                config.github_installation_config(),
                 PgGithubSyncRepo::new(pool.clone()),
                 GithubSyncClientImpl::default(),
             )),
@@ -874,10 +878,7 @@ async fn run() -> anyhow::Result<()> {
     // Which repositories a session may work on is the owner's question, not
     // the deployment's: the same App credentials the egress proxy mints tokens
     // with, read in the other direction - from the user to their installations.
-    let github_token_config = InstallationTokenConfig {
-        client_id: config.github_sync_app_client_id.clone(),
-        private_key_pem: config.github_sync_app_pem_secret_key.as_ref().to_owned(),
-    };
+    let github_token_config = config.github_installation_config();
     let reachable_repositories = Arc::new(GithubReachableRepositories::new(
         ReachableRepositoriesService::new(
             github_token_config.clone(),
@@ -1307,10 +1308,7 @@ async fn run() -> anyhow::Result<()> {
     // Capture only the session's linked GitHub pull request, for every harness.
     let changes_extractor = PullRequestChanges::new(GithubPullRequestChangesetStore::new(
         GithubPullRequestDiffClient::new(InstallationTokenService::new(
-            InstallationTokenConfig {
-                client_id: config.github_sync_app_client_id.clone(),
-                private_key_pem: config.github_sync_app_pem_secret_key.as_ref().to_owned(),
-            },
+            config.github_installation_config(),
             PgGithubSyncRepo::new(pool.clone()),
             GithubSyncClientImpl::default(),
         )),
