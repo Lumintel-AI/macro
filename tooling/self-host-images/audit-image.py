@@ -17,6 +17,9 @@ secret = re.compile(
     rb'|(?<![A-Za-z0-9])AKIA[0-9A-Z]{16}(?![A-Za-z0-9])'
     rb'|(?<![A-Za-z0-9])gh[pousr]_[A-Za-z0-9]{30,255}(?![A-Za-z0-9])'
 )
+# Distro libraries that embed published self-test keys, not deployment secrets.
+# GnuTLS ships fixed FIPS 140 known-answer-test private keys inside libgnutls.
+known_test_key_libraries = re.compile(r'^usr/lib/[a-z0-9_-]+-linux-gnu/libgnutls\.so\.30(?:\.[0-9]+)*$')
 findings = []
 config = subprocess.check_output(["docker", "image", "inspect", image])
 if secret.search(config):
@@ -47,7 +50,7 @@ with tempfile.TemporaryFile() as archive:
                             content = layer.extractfile(member)
                             overlap = b''
                             while chunk := content.read(1024 * 1024):
-                                if secret.search(overlap + chunk):
+                                if secret.search(overlap + chunk) and not known_test_key_libraries.match(name):
                                     findings.append({'path': name, 'reason': 'credential signature'})
                                     break
                                 overlap = chunk[-65536:]
