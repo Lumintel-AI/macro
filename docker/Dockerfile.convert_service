@@ -1,6 +1,6 @@
 # Bookworm glibc is compatible with the Ubuntu Noble runtime.
 FROM rust:1.94-bookworm AS chef
-ENV SQLX_OFFLINE=true CARGO_BUILD_JOBS=2
+ENV SQLX_OFFLINE=true CARGO_BUILD_JOBS=3
 # librdkafka uses CMake; convert's bindings also need libclang.
 RUN apt-get update && apt-get install -y --no-install-recommends \
   cmake \

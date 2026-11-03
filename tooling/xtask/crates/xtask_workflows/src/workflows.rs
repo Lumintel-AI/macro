@@ -60,6 +60,7 @@ mod reusable_deploy_service;
 mod reusable_preview_service;
 mod runners;
 mod sdk_check;
+mod self_host_images;
 mod steps;
 mod test_macrod_update;
 mod vars;
@@ -120,6 +121,11 @@ fn job_mut<'a>(root: &'a mut serde_yaml::Value, id: &str) -> Result<&'a mut serd
 
 /// Every workflow we generate. Add new workflows here.
 const WORKFLOWS: &[WorkflowFile] = &[
+    WorkflowFile {
+        slug: "self_host_images",
+        file_name: "self-host-images.yml",
+        render_yaml: self_host_images::render,
+    },
     WorkflowFile {
         slug: "export_ci_telemetry",
         file_name: "export-ci-telemetry.yml",

@@ -1,5 +1,5 @@
 FROM rust:1.94-trixie AS chef
-ENV SQLX_OFFLINE=true CARGO_BUILD_JOBS=2
+ENV SQLX_OFFLINE=true CARGO_BUILD_JOBS=3
 # Build native dependencies pulled in by workspace-hack, including librdkafka.
 RUN apt-get update && apt-get install -y --no-install-recommends \
   cmake \

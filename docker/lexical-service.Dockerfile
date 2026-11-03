@@ -1,8 +1,5 @@
-FROM oven/bun:1
+FROM oven/bun:1 AS builder
 WORKDIR /app
-
-ARG GITHUB_PACKAGES_TOKEN
-RUN echo '[install.scopes]\nmacro-inc = { token = "'${GITHUB_PACKAGES_TOKEN}'", url = "https://npm.pkg.github.com" }' > /root/.bunfig.toml
 
 COPY . .
 RUN bun install --frozen-lockfile
@@ -21,6 +18,10 @@ RUN mkdir -p node_modules/@macro-inc \
 # against /app/node_modules.
 RUN bun build src/server.ts --target=bun --external loro-crdt --outfile=/app/server.bundle.js
 
+FROM oven/bun:1
+WORKDIR /app
+COPY --from=builder /app/server.bundle.js /app/server.bundle.js
+COPY --from=builder /app/node_modules/loro-crdt /app/node_modules/loro-crdt
 EXPOSE 8096
 
 CMD ["bun", "/app/server.bundle.js"]

@@ -51,3 +51,10 @@
 **/.vscode
 **/*.swp
 **/*.swo
+
+# Never send local credentials to the builder.
+**/*.pem
+**/*.key
+**/credentials*
+**/.aws
+**/.ssh
