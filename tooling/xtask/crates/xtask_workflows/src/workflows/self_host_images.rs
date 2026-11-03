@@ -1,7 +1,7 @@
 //! Public-runner image builds, isolated from deployment workflows.
 
 pub fn render() -> anyhow::Result<String> {
-    let workflow: serde_yaml::Value = serde_yaml::from_str(
+    let mut workflow: serde_yaml::Value = serde_yaml::from_str(
         r###"
 name: Self-host images
 run-name: Images ${{ github.sha }} / ${{ inputs.build_group || 'all' }}
@@ -42,14 +42,15 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     env:
       BUILD_GROUP: ${{ matrix.group }}
       IMAGE_TAG: ${{ needs.plan.outputs.image_tag }}
       SOURCE_SHA: ${{ needs.plan.outputs.source_sha }}
       PUSH_IMAGES: ${{ inputs.push_images || false }}
-      REGISTRY_KIND: ghcr
-      ECR_REGISTRY: ghcr.io
-      ECR_REPOSITORY_PREFIX: lumintel-ai/macro
+      REGISTRY_KIND: ${{ inputs.image_registry || 'ecr' }}
+      ECR_REGISTRY: ${{ inputs.image_registry == 'ghcr' && 'ghcr.io' || vars.ECR_REGISTRY || 'local' }}
+      ECR_REPOSITORY_PREFIX: ${{ inputs.image_registry == 'ghcr' && 'lumintel-ai/macro' || vars.ECR_REPOSITORY_PREFIX || 'lumintel-macro' }}
       VITE_PUBLIC_ORIGIN: ${{ vars.VITE_PUBLIC_ORIGIN || 'https://delegate.lumintel.ai' }}
       VITE_FUSIONAUTH_CLIENT_ID: ${{ vars.VITE_FUSIONAUTH_CLIENT_ID || 'bb8570aa-1529-5eaf-aea7-084078c76620' }}
       VITE_FUSIONAUTH_TENANT_ID: ${{ vars.VITE_FUSIONAUTH_TENANT_ID || 'c46c1f71-3fb9-5b56-903c-1a40e7fe9a27' }}
@@ -104,8 +105,30 @@ jobs:
           ,\n  \".ci-cache/target\": {\"target\": \"/app/target\", \"id\": \"${{ matrix.group == 'web' && 'web-wasm-target'\
           \ || 'rust-target-release' }}\", \"sharing\": \"locked\"}\n}\n"
         skip-extraction: ${{ steps.rust-cache.outputs.cache-hit }}
+    - name: Validate ECR publication variables
+      if: inputs.push_images && inputs.image_registry != 'ghcr'
+      env:
+        ROLE_ARN: ${{ vars.ECR_PUSH_ROLE_ARN }}
+        REGION: ${{ vars.AWS_REGION }}
+      run: |
+        set -euo pipefail
+        : "${ROLE_ARN:?Set ECR_PUSH_ROLE_ARN from Pulumi AWS_ROLE_ARN}"
+        : "${REGION:?Set AWS_REGION}"
+        [[ "$ECR_REGISTRY" != local ]]
+    - name: Assume ECR push role through GitHub OIDC
+      if: inputs.push_images && inputs.image_registry != 'ghcr'
+      uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b
+      with:
+        role-to-assume: ${{ vars.ECR_PUSH_ROLE_ARN }}
+        aws-region: ${{ vars.AWS_REGION }}
+        audience: sts.amazonaws.com
+    - name: Log in to private ECR
+      if: inputs.push_images && inputs.image_registry != 'ghcr'
+      run: |
+        set -euo pipefail
+        aws ecr get-login-password --region "$AWS_REGION" | docker login "$ECR_REGISTRY" --username AWS --password-stdin
     - name: Log in to GHCR with the workflow token
-      if: inputs.push_images
+      if: inputs.push_images && inputs.image_registry == 'ghcr'
       env:
         GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: 'set -euo pipefail
@@ -162,11 +185,23 @@ jobs:
         description: All images or one failed group
         type: string
         default: all
+      image_registry:
+        description: Publication registry, ECR by default; GHCR fallback
+        type: choice
+        options: [ecr, ghcr]
+        default: ecr
       push_images:
-        description: Publish audited images only when public visibility can be set
+        description: Publish audited images to the selected registry
         type: boolean
         default: false
 "###,
     )?;
+    // Share the measured build steps, but grant OIDC only to opt-in publication.
+    let mut publish = workflow["jobs"]["build"].clone();
+    publish["if"] = serde_yaml::Value::String("${{ inputs.push_images == true }}".into());
+    workflow["jobs"]["publish"] = publish;
+    workflow["jobs"]["build"]["if"] =
+        serde_yaml::Value::String("${{ inputs.push_images != true }}".into());
+    workflow["jobs"]["build"]["permissions"] = serde_yaml::from_str("contents: read")?;
     Ok(serde_yaml::to_string(&workflow)?)
 }
