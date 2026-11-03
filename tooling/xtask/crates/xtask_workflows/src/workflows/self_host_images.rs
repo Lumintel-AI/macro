@@ -46,7 +46,7 @@ jobs:
       BUILD_GROUP: ${{ matrix.group }}
       IMAGE_TAG: ${{ needs.plan.outputs.image_tag }}
       SOURCE_SHA: ${{ needs.plan.outputs.source_sha }}
-      PUSH_IMAGES: ${{ github.event_name == 'push' || inputs.push_images }}
+      PUSH_IMAGES: ${{ inputs.push_images || false }}
       REGISTRY_KIND: ghcr
       ECR_REGISTRY: ghcr.io
       ECR_REPOSITORY_PREFIX: lumintel-ai/macro
@@ -105,7 +105,7 @@ jobs:
           \ || 'rust-target-release' }}\", \"sharing\": \"locked\"}\n}\n"
         skip-extraction: ${{ steps.rust-cache.outputs.cache-hit }}
     - name: Log in to GHCR with the workflow token
-      if: github.event_name == 'push' || inputs.push_images
+      if: inputs.push_images
       env:
         GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: 'set -euo pipefail
@@ -163,9 +163,9 @@ jobs:
         type: string
         default: all
       push_images:
-        description: Publish audited images to GHCR
+        description: Publish audited images only when public visibility can be set
         type: boolean
-        default: true
+        default: false
 "###,
     )?;
     Ok(serde_yaml::to_string(&workflow)?)
