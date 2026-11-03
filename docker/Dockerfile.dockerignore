@@ -58,3 +58,5 @@
 **/credentials*
 **/.aws
 **/.ssh
+# lexical_client embeds this public local-dev CA certificate (no key) at compile time.
+!infra/local/certs/ca.pem
