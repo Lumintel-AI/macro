@@ -205,7 +205,10 @@ async fn unconfigured_rtc_refuses_rooms_and_tokens_without_network_access() {
     assert!(client.list_rooms().await.is_err());
     assert!(
         client
-            .generate_token("test-room", "macro|user@example.com".parse().unwrap())
+            .generate_token(
+                "test-room",
+                MacroUserIdStr::try_from_email("user@example.com").unwrap(),
+            )
             .await
             .is_err()
     );

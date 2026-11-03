@@ -368,7 +368,7 @@ async fn history_includes_canceled_subscriptions_and_every_page() {
         serde_json::json!({"object":"list", "url":"/v1/subscriptions", "data":[canceled], "has_more":true}),
         serde_json::json!({"object":"list", "url":"/v1/subscriptions", "data":[trial], "has_more":false}),
     ]).await;
-    let history = subscription_history(&gateway.stripe, &"cus_test".parse().unwrap())
+    let history = subscription_history(gateway.stripe().unwrap(), &"cus_test".parse().unwrap())
         .await
         .unwrap();
     task.abort();
@@ -427,7 +427,7 @@ async fn only_terminal_subscriptions_allow_a_replacement() {
             "object":"list", "url":"/v1/subscriptions", "data":[subscription], "has_more":false
         })])
         .await;
-        let history = subscription_history(&gateway.stripe, &"cus_test".parse().unwrap())
+        let history = subscription_history(gateway.stripe().unwrap(), &"cus_test".parse().unwrap())
             .await
             .unwrap();
         task.abort();

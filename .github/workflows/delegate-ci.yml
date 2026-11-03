@@ -114,7 +114,7 @@ jobs:
           docker exec "$POSTGRES_CONTAINER" psql -v ON_ERROR_STOP=1 -U user -d macrodb \
             -c 'ALTER SYSTEM SET max_locks_per_transaction = 8192'
           docker restart "$POSTGRES_CONTAINER"
-          for attempt in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             if docker exec "$POSTGRES_CONTAINER" pg_isready -U user -d macrodb; then
               exit 0
             fi
@@ -135,6 +135,9 @@ jobs:
           name: optional-billing-query-metadata
           include-hidden-files: true
           path: .sqlx/
+      - name: Install process-isolated test runner
+        if: matrix.package == 'agent_harness'
+        run: cargo install cargo-nextest --locked --version 0.9.140
       - name: Run the changed package's test targets
         run: |
           # The worker's storage backends are mutually exclusive, as in upstream CI.
@@ -142,7 +145,14 @@ jobs:
           if [ "$PACKAGE" = sync_service ]; then
             features=()
           fi
-          cargo test --locked --no-fail-fast "${features[@]}" -p "$PACKAGE"
+          # SQLx's shared setup pool cannot safely span the per-test Tokio runtimes
+          # in this suite. Match upstream's process isolation and worker limit.
+          if [ "$PACKAGE" = agent_harness ]; then
+            cargo nextest run --locked --no-fail-fast --test-threads=2 "${features[@]}" -p "$PACKAGE"
+            cargo test --locked --doc "${features[@]}" -p "$PACKAGE"
+          else
+            cargo test --locked --no-fail-fast "${features[@]}" -p "$PACKAGE"
+          fi
       - name: Record result and remaining disk
         if: always()
         env:

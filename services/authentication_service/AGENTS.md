@@ -154,3 +154,5 @@ while retaining starter documents. Support channels remain enabled by default.
 ## Optional billing and GitHub
 
 Stripe and GitHub OAuth credentials are optional. Signups without Stripe save NULL billing customer ids after the `optional_stripe_customer` migration. Checkout and plan-change entry points return HTTP 503 without Stripe credentials or prices. See `docs/development/optional-integrations.md`.
+
+GitHub link initiation checks the GitHub domain service configuration before creating a pending link or contacting FusionAuth.

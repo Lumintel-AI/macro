@@ -185,12 +185,7 @@ pub async fn init_github_link_handler(
     ip_context: ClientIp,
     authorization: MacroAuthorizationExtractor<AuthorizationService, UserOrInternal>,
 ) -> Result<Json<InitGithubLinkResponse>, InitGithubLinkError> {
-    if ctx.config.github_client_id.is_none()
-        || ctx.config.github_client_secret.is_none()
-        || ctx.config.github_idp_id.is_none()
-    {
-        return Err(GithubError::Unavailable.into());
-    }
+    ctx.github_link_service.ensure_configured()?;
     let Query(InitGithubLinkQueryParams { original_url }) = query;
     let fusion_user_id = &authorization.authorization.user.user_context.fusion_user_id;
     let initiator =

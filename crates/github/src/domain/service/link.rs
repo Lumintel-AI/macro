@@ -65,6 +65,11 @@ impl<R: GithubRepo, U: GithubOauth, F: Auth, E: GithubPullRequestService>
         }
     }
 
+    /// Refuses new account-link flows when OAuth credentials are absent.
+    pub fn ensure_configured(&self) -> Result<(), GithubError> {
+        self.config().map(|_| ())
+    }
+
     fn config(&self) -> Result<&super::GithubLinkConfig, GithubError> {
         self.config.as_ref().ok_or(GithubError::Unavailable)
     }

@@ -65,7 +65,7 @@ pub async fn process_message(
 
     tracing::info!(job_id=%job_id, message_body=?req, "message body");
 
-    let document_key = s3_key::DocumentKey::parse(&req.to_key).ok();
+    let document_key = s3_key::DocumentKey::from_s3_key(&req.to_key).ok();
     let result = convert(&job_id, &req, s3_client).await;
 
     if let Err(e) = cleanup_folder(&job_id) {

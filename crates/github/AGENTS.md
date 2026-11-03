@@ -90,3 +90,5 @@ Task comment links use `AppServiceUrl` and `OVERRIDE_APP_SERVICE_URL`. The local
 ## Optional GitHub credentials
 
 Installation-token, repository-listing and account-link services accept optional credential configuration. Operations requiring an absent configuration return an unavailable error before provider authentication. Configured constructors preserve existing behavior.
+
+Call `GithubLinkServiceImpl::ensure_configured` before persisting a pending OAuth link; absent credentials return `GithubError::Unavailable` before database or provider work.

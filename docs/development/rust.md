@@ -72,6 +72,10 @@ CI limits Cargo to two concurrent build jobs for tests because linking several
 large service test binaries can exhaust runner memory. Nextest's test worker
 count is configured separately; the build limit does not reduce test coverage.
 
+The fork CI runs `agent_harness` with Nextest process isolation and two test
+workers, matching its crate guide. Its doctests run separately with
+`cargo test --doc`. Other changed packages use `cargo test`.
+
 Keep tests in a sibling `test.rs` (CS-49). For example, `src/user.rs` declares:
 
 ```rust

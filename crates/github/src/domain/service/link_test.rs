@@ -1,3 +1,4 @@
+mod configuration;
 mod lookup;
 mod pull_request_state;
 mod recovery;
