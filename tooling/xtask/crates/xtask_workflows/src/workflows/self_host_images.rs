@@ -42,7 +42,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write
     env:
       BUILD_GROUP: ${{ matrix.group }}
       IMAGE_TAG: ${{ needs.plan.outputs.image_tag }}
@@ -108,20 +107,18 @@ jobs:
     - name: Validate ECR publication variables
       if: inputs.push_images && inputs.image_registry != 'ghcr'
       env:
-        ROLE_ARN: ${{ vars.ECR_PUSH_ROLE_ARN }}
         REGION: ${{ vars.AWS_REGION }}
       run: |
         set -euo pipefail
-        : "${ROLE_ARN:?Set ECR_PUSH_ROLE_ARN from Pulumi AWS_ROLE_ARN}"
         : "${REGION:?Set AWS_REGION}"
         [[ "$ECR_REGISTRY" != local ]]
-    - name: Assume ECR push role through GitHub OIDC
+    - name: Configure ECR push credentials
       if: inputs.push_images && inputs.image_registry != 'ghcr'
       uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b
       with:
-        role-to-assume: ${{ vars.ECR_PUSH_ROLE_ARN }}
+        aws-access-key-id: ${{ secrets.AWS_ECR_PUSH_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_ECR_PUSH_SECRET_ACCESS_KEY }}
         aws-region: ${{ vars.AWS_REGION }}
-        audience: sts.amazonaws.com
     - name: Log in to private ECR
       if: inputs.push_images && inputs.image_registry != 'ghcr'
       run: |
@@ -196,12 +193,15 @@ jobs:
         default: false
 "###,
     )?;
-    // Share the measured build steps, but grant OIDC only to opt-in publication.
+    // Publication requires an explicit opt-in on the trusted repository and branch.
     let mut publish = workflow["jobs"]["build"].clone();
-    publish["if"] = serde_yaml::Value::String("${{ inputs.push_images == true }}".into());
+    publish["if"] = serde_yaml::Value::String("${{ inputs.push_images == true && github.repository == 'Lumintel-AI/macro' && github.ref == 'refs/heads/self-host' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}".into());
     workflow["jobs"]["publish"] = publish;
     workflow["jobs"]["build"]["if"] =
         serde_yaml::Value::String("${{ inputs.push_images != true }}".into());
     workflow["jobs"]["build"]["permissions"] = serde_yaml::from_str("contents: read")?;
     Ok(serde_yaml::to_string(&workflow)?)
 }
+
+#[cfg(test)]
+mod test;
