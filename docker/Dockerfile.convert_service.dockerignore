@@ -56,6 +56,10 @@
 **/*.pem
 **/*.key
 **/credentials*
+# Rust modules named credentials are source code, not secrets.
+!**/src/**/credentials.rs
+!**/src/**/credentials
+!**/src/**/credentials/**
 **/.aws
 **/.ssh
 # lexical_client embeds this public local-dev CA certificate (no key) at compile time.

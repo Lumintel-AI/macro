@@ -14,3 +14,7 @@ measurements
 **/*.pem
 **/*.key
 **/credentials*
+# Rust modules named credentials are source code, not secrets.
+!**/src/**/credentials.rs
+!**/src/**/credentials
+!**/src/**/credentials/**
