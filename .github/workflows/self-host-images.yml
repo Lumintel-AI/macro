@@ -40,7 +40,7 @@ jobs:
       BUILD_GROUP: ${{ matrix.group }}
       IMAGE_TAG: ${{ needs.plan.outputs.image_tag }}
       SOURCE_SHA: ${{ needs.plan.outputs.source_sha }}
-      PUSH_IMAGES: ${{ inputs.push_images || false }}
+      PUSH_IMAGES: ${{ github.event_name == 'push' || inputs.push_images }}
       REGISTRY_KIND: ghcr
       ECR_REGISTRY: ghcr.io
       ECR_REPOSITORY_PREFIX: lumintel-ai/macro
@@ -89,7 +89,7 @@ jobs:
           }
         skip-extraction: ${{ steps.rust-cache.outputs.cache-hit }}
     - name: Log in to GHCR with the workflow token
-      if: inputs.push_images
+      if: github.event_name == 'push' || inputs.push_images
       env:
         GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
@@ -122,6 +122,12 @@ jobs:
         path: measurements/
         retention-days: 14
 on:
+  push:
+    branches:
+    - self-host
+    paths:
+    - .github/workflows/self-host-images.yml
+    - tooling/self-host-images/**
   workflow_dispatch:
     inputs:
       build_group:
