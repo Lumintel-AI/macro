@@ -9,7 +9,8 @@ use sqlx::{Pool, Postgres};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tracing::field::{Field, Visit};
-use tracing_subscriber::layer::{Context, SubscriberExt as _};
+use tracing_subscriber::filter::dynamic_filter_fn;
+use tracing_subscriber::layer::{Context, Layer as _, SubscriberExt as _};
 use tracing_subscriber::registry::LookupSpan;
 
 /// The fixture link that tests purge.
@@ -260,9 +261,20 @@ impl Visit for IntegerFields<'_> {
 )]
 async fn purge_phases_record_their_batches_and_pauses(pool: Pool<Postgres>) -> anyhow::Result<()> {
     let recorded = RecordedFields::default();
-    let _guard =
-        tracing::subscriber::set_default(tracing_subscriber::registry().with(recorded.clone()));
-    tracing::callsite::rebuild_interest_cache();
+    // Callsite interest is process-wide: a scoped subscriber can miss a phase first
+    // reached by another test thread. Keep a global subscriber, but capture only this
+    // thread so concurrent purges cannot overwrite the recorded phase totals.
+    let test_thread = std::thread::current().id();
+    tracing::subscriber::set_global_default(tracing_subscriber::registry().with(
+        recorded.clone().with_filter(dynamic_filter_fn(move |_, _| {
+            std::thread::current().id() == test_thread
+        })),
+    ))?;
+    // Exercise cache rebuilding off the recording thread, as concurrent tests can do
+    // when they first register the purge phase callsites.
+    std::thread::spawn(tracing::callsite::rebuild_interest_cache)
+        .join()
+        .expect("callsite registration thread panicked");
     let pause = Duration::from_millis(5);
 
     let summary = purge_link(

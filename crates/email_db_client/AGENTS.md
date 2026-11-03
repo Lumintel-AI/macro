@@ -45,6 +45,10 @@ Parsed message responses expose the draft generation captured in the same SQL sn
 
 ## Gotchas
 
+- The purge tracing test installs the test binary's global subscriber and dynamically
+  filters capture to its own thread. A thread-local subscriber alone can miss phase
+  callsites first registered by another concurrent purge test.
+
 - Undated provider drafts use creation time for All Mail eligibility; spam/junk
   and trash remain excluded, including the timestamp override for synced Macro
   drafts. Keep ingestion, recomputation, and cached projections aligned.
