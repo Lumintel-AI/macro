@@ -18,6 +18,11 @@
 /apps
 /packages
 
+# Rust modules also live in directories named build. Keep source trees.
+**/build
+!**/src/**/build
+!**/src/**/build/**
+
 # Secrets and local configuration
 .env
 .env.*
@@ -31,10 +36,6 @@
 **/node_modules
 **/target
 **/dist
-# Rust modules also live in directories named build. Keep source trees.
-**/build
-!**/src/**/build
-!**/src/**/build/**
 **/.wrangler
 **/test-results
 **/playwright-report
