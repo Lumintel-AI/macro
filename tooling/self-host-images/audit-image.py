@@ -9,7 +9,14 @@ import tarfile
 import tempfile
 
 image, report = sys.argv[1:]
-secret = re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{30,}')
+# File-type databases contain PEM headers as detection strings. Require a full
+# key block, and token boundaries so binary character tables are not credentials.
+secret = re.compile(
+    rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----\s+'
+    rb'[A-Za-z0-9+/=\r\n]{32,32768}-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'
+    rb'|(?<![A-Za-z0-9])AKIA[0-9A-Z]{16}(?![A-Za-z0-9])'
+    rb'|(?<![A-Za-z0-9])gh[pousr]_[A-Za-z0-9]{30,255}(?![A-Za-z0-9])'
+)
 findings = []
 config = subprocess.check_output(["docker", "image", "inspect", image])
 if secret.search(config):
@@ -43,7 +50,7 @@ with tempfile.TemporaryFile() as archive:
                                 if secret.search(overlap + chunk):
                                     findings.append({'path': name, 'reason': 'credential signature'})
                                     break
-                                overlap = chunk[-256:]
+                                overlap = chunk[-65536:]
                 except tarfile.ReadError:
                     pass
 result = {'image': image, 'files_checked': files, 'findings': findings}
