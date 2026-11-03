@@ -25,6 +25,7 @@ import { isTauri } from '@core/util/platform';
 import { platformFetch } from '@core/util/platformFetch';
 import type { ResultError } from '@core/util/result';
 import type { SafeFetchInit } from '@core/util/safeFetch';
+import { getWebOrigin } from '@core/util/webOrigin';
 import type { IDocumentStorageServiceFile } from '@filesystem/file';
 import type { SerializedEditorState } from 'lexical';
 import { err, ok, type Result } from 'neverthrow';
@@ -219,10 +220,6 @@ const MINUTES_BEFORE_PRESIGNED_EXPIRES = 14;
 
 const dssHost = SERVER_HOSTS['document-storage-service'];
 const syncServiceWorkerHost = SYNC_SERVICE_HOSTS.worker;
-const syncOrigin =
-  import.meta.env.MODE === 'development'
-    ? 'https://dev.macro.com'
-    : 'https://macro.com';
 
 export function dssFetch(
   url: string,
@@ -1620,7 +1617,7 @@ export const storageServiceClient = {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
-          ...(isTauri() && { Origin: syncOrigin }),
+          ...(isTauri() && { Origin: getWebOrigin() }),
         },
         method: 'GET',
       }

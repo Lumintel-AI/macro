@@ -1,4 +1,6 @@
-export const MACRO_MCP_URL = 'https://mcp-server.macro.com/mcp';
+import { SERVER_HOSTS } from '@core/constant/servers';
+
+export const MACRO_MCP_URL = SERVER_HOSTS.mcp;
 
 export const MACRO_MCP_CONFIG = JSON.stringify(
   {

@@ -1,10 +1,10 @@
 import type { DocumentOp } from '@ai-ops/editor';
 import { resumeDocumentSpan } from '@block-md/observability';
 import { MACRO_AGENT_NAME } from '@core/constant/macroAgent';
+import { SERVER_HOSTS } from '@core/constant/servers';
 import { Telemetry } from '@macro-inc/observability';
 import { getDocumentPermissionToken } from '@service-storage/client';
 import { createSignal } from 'solid-js';
-import { developmentProxyUrl } from '../../core/constant/developmentProxy';
 import {
   type AiUsageLimitError,
   readAiUsageLimitError,
@@ -16,12 +16,7 @@ const overrideUrl: string | undefined = import.meta.env
   .VITE_AI_EDITING_WORKER_URL;
 
 const AI_EDITING_WORKER_HOST =
-  overrideUrl?.replace(/\/$/, '') ??
-  developmentProxyUrl(
-    import.meta.env.MODE === 'development'
-      ? 'https://ai-editing-worker-dev.macroverse.workers.dev'
-      : 'https://ai-editing-worker.macroverse.workers.dev'
-  );
+  overrideUrl?.replace(/\/$/, '') ?? SERVER_HOSTS['ai-editing'];
 
 /**
  * Model fallback chains per worker role. Mirrors the chains the backend

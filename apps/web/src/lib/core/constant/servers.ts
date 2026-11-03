@@ -1,6 +1,8 @@
 import { developmentProxyUrl } from './developmentProxy';
 
 const serverHostLocal: Servers = {
+  'ai-editing': 'http://localhost:8788',
+  mcp: 'http://localhost:8101/mcp',
   'auth-service': 'http://localhost:8080',
   'auth-logout': 'http://localhost:3000', // TODO: make work with local fusionauth later
   'pdf-service': 'http://localhost:4567',
@@ -40,6 +42,12 @@ const authLogoutUrl = publicOrigin
     : 'https://auth.macro.com/oauth2/logout?client_id=75409999-7dc4-4241-b73b-a51818c3a71c&tenantId=a3e53c3d-8d6a-3e92-d64c-fa3bf30a60be';
 
 const directServerHostRemote = {
+  'ai-editing': publicOrigin
+    ? `${publicOrigin}/ai-editing`
+    : `https://ai-editing-worker${devServerSuffix}.macroverse.workers.dev`,
+  mcp: publicOrigin
+    ? `${publicOrigin}/mcp`
+    : 'https://mcp-server.macro.com/mcp',
   'auth-service': `${gatewayHost}/auth`,
   'auth-logout': authLogoutUrl,
   // Self-hosted deployments leave PDF jobs and demo WebSockets unavailable.
@@ -118,6 +126,8 @@ export const SERVER_HOSTS: Servers =
 function proxyServers(): Servers | undefined {
   if (!proxyOrigin || !wsProxyOrigin) return undefined;
   return {
+    'ai-editing': serverHostLocal['ai-editing'],
+    mcp: `${proxyOrigin}/mcp`,
     'auth-service': `${proxyOrigin}/auth`,
     'auth-logout': serverHostLocal['auth-logout'],
     'pdf-service': serverHostLocal['pdf-service'], // no local container
@@ -207,6 +217,12 @@ function selectSyncServiceHost():
     return {
       worker: `https://${overrideHost}`,
       ws: `wss://${overrideHost}`,
+    };
+  }
+  if (publicOrigin) {
+    return {
+      worker: `${publicOrigin}/sync`,
+      ws: `${publicOrigin.replace(/^http/, 'ws')}/sync`,
     };
   }
   if (import.meta.env.MODE !== 'development') {

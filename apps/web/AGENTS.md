@@ -24,7 +24,11 @@ origin's API prefixes, including `/agent-harness`, `/cognition`, `/preview` and
 `/scheduled-action`. PDF jobs and demo WebSockets target `/i` and `/websocket`;
 keep those routes unavailable when their services are deferred.
 Set `VITE_SYNC_SERVICE_HOST` to the Worker hostname or public hostname plus
-`/sync`, without a scheme. Unset host variables preserve upstream defaults.
+`/sync`, without a scheme. Without a sync override, a configured public origin
+uses its `/sync` route. Native sync requests use `getWebOrigin` for their Origin
+header, including sync requests made by the storage client. MCP setup points
+to `/mcp`; AI editing targets the deferred `/ai-editing` route. Invite links
+use `getWebOrigin`. Unset public origin preserves upstream defaults.
 Vite supplies HTML asset paths and the gateway preconnect through `defineEnv`.
 These are public build inputs, so changing them requires rebuilding the image.
 

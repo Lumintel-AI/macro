@@ -8,17 +8,13 @@ import { isTauri } from '@core/util/platform';
 import { platformFetch } from '@core/util/platformFetch';
 import type { ObjectLike, ResultError } from '@core/util/result';
 import type { SafeFetchInit } from '@core/util/safeFetch';
+import { getWebOrigin } from '@core/util/webOrigin';
 import { InitializeFromSnapshotRequest } from '@macro-inc/collaboration/sync-service/generated/schema';
 import type { SerializedEditorState } from 'lexical';
 import { err, ok, type Result } from 'neverthrow';
 import type { BlameRow, DocumentMetadata } from './generated/http/schemas';
 
 const SYNC_SERVICE_WORKER_URL = `${SYNC_SERVICE_HOSTS['worker']}`;
-
-const SYNC_ORIGIN =
-  import.meta.env.MODE === 'development'
-    ? 'https://dev.macro.com'
-    : 'https://macro.com';
 
 const WAKEUP_TTL = 55 * 1000;
 const WAKEUP_DEBOUNCE_MS = 200;
@@ -58,7 +54,7 @@ function syncFetch<T extends ObjectLike = never>(
     ...init,
     headers: {
       ...init?.headers,
-      ...(isTauri() && { Origin: SYNC_ORIGIN }),
+      ...(isTauri() && { Origin: getWebOrigin() }),
     },
   });
 }
@@ -226,7 +222,7 @@ export const syncServiceClient = {
         headers: {
           'Content-Type': 'application/octet-stream',
           Authorization: `Bearer ${token}`,
-          ...(isTauri() && { Origin: SYNC_ORIGIN }),
+          ...(isTauri() && { Origin: getWebOrigin() }),
         },
         method: 'GET',
       }
@@ -258,7 +254,7 @@ export const syncServiceClient = {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
-          ...(isTauri() && { Origin: SYNC_ORIGIN }),
+          ...(isTauri() && { Origin: getWebOrigin() }),
         },
         method: 'GET',
       }

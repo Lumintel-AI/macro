@@ -151,3 +151,16 @@ it('rejects a public URL containing a path', async () => {
   vi.stubEnv('VITE_PUBLIC_ORIGIN', 'https://app.example.test/app');
   await expect(productionConfig()).rejects.toThrow('VITE_PUBLIC_ORIGIN');
 });
+
+it('keeps sync on the configured origin when no Worker override is supplied', async () => {
+  vi.stubEnv('VITE_PUBLIC_ORIGIN', 'https://app.example.test');
+  vi.stubEnv('VITE_FUSIONAUTH_CLIENT_ID', '00000000-0000-4000-8000-000000000001');
+  vi.stubEnv('VITE_FUSIONAUTH_TENANT_ID', '00000000-0000-4000-8000-000000000002');
+  vi.stubEnv('VITE_SYNC_SERVICE_HOST', '');
+  const result = await compileHosts();
+  expect(result.sync).toEqual({
+    worker: 'https://app.example.test/sync',
+    ws: 'wss://app.example.test/sync',
+  });
+  expect(result.code).not.toContain('macroverse.workers.dev');
+}, 30_000);

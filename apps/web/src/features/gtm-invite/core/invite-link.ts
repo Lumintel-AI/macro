@@ -4,7 +4,7 @@
  * the token in localStorage until the visitor has an account; the first
  * authenticated load redeems it and the plan step shows the offer.
  */
-import { isTauri } from '@core/util/platform';
+import { getWebOrigin } from '@core/util/webOrigin';
 import type { GtmInviteLinkStatus } from '@service-auth/generated/schemas/gtmInviteLinkStatus';
 import { match } from 'ts-pattern';
 
@@ -32,16 +32,7 @@ export function isPlausibleInviteToken(value: unknown): value is string {
  * prospect, so links always point at the web app.
  */
 export function inviteLinkOrigin(): string {
-  if (
-    typeof window !== 'undefined' &&
-    !isTauri() &&
-    window.location.hostname === 'localhost'
-  ) {
-    return window.location.origin;
-  }
-  return import.meta.env.MODE === 'development'
-    ? 'https://dev.macro.com'
-    : 'https://macro.com';
+  return getWebOrigin();
 }
 
 export function buildInviteLinkUrl(
